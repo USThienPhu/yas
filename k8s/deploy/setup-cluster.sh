@@ -16,6 +16,21 @@ wait_for_crd() {
   kubectl wait --for=condition=Established "crd/$1" --timeout=120s
 }
 
+wait_for_pod_ready() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  until kubectl get pod "$pod_name" -n "$namespace" >/dev/null 2>&1; do
+    echo "Waiting for pod $namespace/$pod_name to be created..."
+    sleep 5
+  done
+
+  until [ "$(kubectl get pod "$pod_name" -n "$namespace" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')" = "True" ]; do
+    echo "Waiting for pod $namespace/$pod_name to be Ready..."
+    sleep 5
+  done
+}
+
 require_command helm
 require_command kubectl
 require_command yq
@@ -102,7 +117,7 @@ helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
 --set postgresql.password="$POSTGRESQL_PASSWORD" \
 --set debeziumConnect.enabled=true \
 --set postgresqlConnector.enabled=true
-kubectl wait --for=condition=Ready pod/debezium-connect-cluster-connect-0 -n kafka --timeout=300s
+wait_for_pod_ready kafka debezium-connect-cluster-connect-0
 
 section "Installing AKHQ"
 helm upgrade --install akhq akhq/akhq \
