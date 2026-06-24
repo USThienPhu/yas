@@ -19,7 +19,7 @@ backend:
     - name: SPRING_PROFILES_ACTIVE
       value: prod
     - name: UI_HOST
-      value: http://storefront-ui:3000
+      value: http://storefront-ui.yas.svc.cluster.local:3000
   extraEnvFroms:
     - secretRef:
         name: yas-keycloak-credentials-secret
