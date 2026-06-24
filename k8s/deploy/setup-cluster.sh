@@ -67,8 +67,7 @@ helm upgrade --install postgres ./postgres/postgresql \
 section "Installing pgAdmin"
 helm upgrade --install pgadmin ./postgres/pgadmin \
 --create-namespace --namespace postgres \
---set-string hostname="pgadmin.$DOMAIN" \
---set-string ingress.hosts[0].host="pgadmin.$DOMAIN"
+--set-string hostname="pgadmin.$DOMAIN"
 
 section "Installing Strimzi Kafka operator"
 helm upgrade --install kafka-operator strimzi/strimzi-kafka-operator \
