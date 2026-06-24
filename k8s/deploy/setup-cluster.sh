@@ -72,7 +72,7 @@ helm upgrade --install pgadmin ./postgres/pgadmin \
 section "Installing Strimzi Kafka operator"
 helm upgrade --install kafka-operator strimzi/strimzi-kafka-operator \
 --create-namespace --namespace kafka \
---version 0.47.0
+--version 0.45.0
 kubectl rollout status deployment/strimzi-cluster-operator -n kafka --timeout=180s
 wait_for_crd kafkas.kafka.strimzi.io
 wait_for_crd kafkaconnects.kafka.strimzi.io

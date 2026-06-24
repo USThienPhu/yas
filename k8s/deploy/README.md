@@ -36,6 +36,7 @@ If Kafka was already installed with an older broken configuration, reset the Kaf
 kubectl delete namespace kafka --ignore-not-found --wait=true
 ./setup-cluster.sh
 ```
+The local Kafka chart is still ZooKeeper-based, so `setup-cluster.sh` pins Strimzi to `0.45.0`. Strimzi `0.46.0` and newer only support KRaft-based Kafka clusters.
 - Execute [setup-keycloak.sh](setup-keycloak.sh) to set up keycloak as the Identity and Access Management server.
 ```shell
 ./setup-keycloak.sh
