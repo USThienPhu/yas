@@ -1,5 +1,6 @@
 kafka:
   replicas: 1
+  storeSize: 5Gi
 zookeeper:
   replicas: 1
   storeSize: 5Gi
@@ -7,5 +8,8 @@ postgresql:
   username: yasadminuser
   password: admin
 debeziumConnect:
+  enabled: true
   image: ghcr.io/nashtech-garage/debezium-connect-postgresql:latest
   buildImage: false #Enabled when build debezium-connect-postgresql image
+postgresqlConnector:
+  enabled: true

@@ -31,6 +31,11 @@ minikube addons enable ingress
 ```shell
 ./setup-cluster.sh
 ```
+If Kafka was already installed with an older broken configuration, reset the Kafka namespace before rerunning the script:
+```shell
+kubectl delete namespace kafka --ignore-not-found --wait=true
+./setup-cluster.sh
+```
 - Execute [setup-keycloak.sh](setup-keycloak.sh) to set up keycloak as the Identity and Access Management server.
 ```shell
 ./setup-keycloak.sh

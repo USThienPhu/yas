@@ -1,10 +1,24 @@
+#!/bin/bash
+set -euo pipefail
 
-set -x
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1"
+    exit 1
+  fi
+}
+
+require_command helm
+require_command yq
+
+if ! yq --version | grep -qi "mikefarah\|version v4"; then
+  echo "This script requires Mike Farah yq v4. Install from https://github.com/mikefarah/yq"
+  exit 1
+fi
 
 #Read configuration value from cluster-config.yaml file
-read -rd '' REDIS_PASSWORD \
-< <(yq -r '.redis.password' ./cluster-config.yaml)
+REDIS_PASSWORD="$(yq -r '.redis.password' ./cluster-config.yaml)"
 
-helm install redis \
+helm upgrade --install redis \
   --set auth.password="$REDIS_PASSWORD" \
   oci://registry-1.docker.io/bitnamicharts/redis -n redis --create-namespace

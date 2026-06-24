@@ -1,12 +1,32 @@
 #!/bin/bash
-set -x
+set -euo pipefail
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1"
+    exit 1
+  fi
+}
+
+require_command helm
+require_command kubectl
+require_command yq
+
+if ! yq --version | grep -qi "mikefarah\|version v4"; then
+  echo "This script requires Mike Farah yq v4. Install from https://github.com/mikefarah/yq"
+  exit 1
+fi
+
+if ! kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+  echo "Missing ServiceMonitor CRD. Run ./setup-cluster.sh successfully before deploying YAS applications."
+  exit 1
+fi
 
 # Auto restart when change configmap or secret
 helm repo add stakater https://stakater.github.io/stakater-charts
 helm repo update
 
-read -rd '' DOMAIN \
-< <(yq -r '.domain' ./cluster-config.yaml)
+DOMAIN="$(yq -r '.domain' ./cluster-config.yaml)"
 
 helm dependency build ../charts/backoffice-bff
 helm upgrade --install backoffice-bff ../charts/backoffice-bff \

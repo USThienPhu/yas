@@ -1,3 +1,4 @@
+{{- if .Values.postgresqlConnector.enabled }}
 apiVersion: kafka.strimzi.io/v1beta2
 kind: KafkaConnector
 metadata:
@@ -19,3 +20,4 @@ spec:
     value.converter.schemas.enable: false
     value.converter: org.apache.kafka.connect.json.JsonConverter
     key.converter: org.apache.kafka.connect.json.JsonConverter
+{{- end }}

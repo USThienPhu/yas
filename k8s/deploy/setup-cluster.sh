@@ -38,17 +38,18 @@ helm repo update
 
 section "Reading cluster configuration"
 mapfile -t config_values < <(yq -r '.domain, .postgresql.replicas, .postgresql.username,
- .postgresql.password, .kafka.replicas, .zookeeper.replicas,
+ .postgresql.password, .kafka.replicas, .kafka.storeSize, .zookeeper.replicas,
  .elasticsearch.replicas, .grafana.username, .grafana.password' ./cluster-config.yaml)
 DOMAIN="${config_values[0]}"
 POSTGRESQL_REPLICAS="${config_values[1]}"
 POSTGRESQL_USERNAME="${config_values[2]}"
 POSTGRESQL_PASSWORD="${config_values[3]}"
 KAFKA_REPLICAS="${config_values[4]}"
-ZOOKEEPER_REPLICAS="${config_values[5]}"
-ELASTICSEARCH_REPLICAS="${config_values[6]}"
-GRAFANA_USERNAME="${config_values[7]}"
-GRAFANA_PASSWORD="${config_values[8]}"
+KAFKA_STORE_SIZE="${config_values[5]}"
+ZOOKEEPER_REPLICAS="${config_values[6]}"
+ELASTICSEARCH_REPLICAS="${config_values[7]}"
+GRAFANA_USERNAME="${config_values[8]}"
+GRAFANA_PASSWORD="${config_values[9]}"
 
 section "Installing PostgreSQL operator"
 helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator \
@@ -78,13 +79,29 @@ wait_for_crd kafkas.kafka.strimzi.io
 wait_for_crd kafkaconnects.kafka.strimzi.io
 wait_for_crd kafkaconnectors.kafka.strimzi.io
 
-section "Installing Kafka cluster and Debezium connector"
+section "Installing Kafka cluster"
 helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
 --create-namespace --namespace kafka \
 --set kafka.replicas="$KAFKA_REPLICAS" \
+--set kafka.storeSize="$KAFKA_STORE_SIZE" \
 --set zookeeper.replicas="$ZOOKEEPER_REPLICAS" \
 --set postgresql.username="$POSTGRESQL_USERNAME" \
---set postgresql.password="$POSTGRESQL_PASSWORD"
+--set postgresql.password="$POSTGRESQL_PASSWORD" \
+--set debeziumConnect.enabled=false \
+--set postgresqlConnector.enabled=false
+kubectl wait --for=condition=Ready kafka/kafka-cluster -n kafka --timeout=600s
+
+section "Installing Debezium Kafka Connect and PostgreSQL connector"
+helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
+--create-namespace --namespace kafka \
+--set kafka.replicas="$KAFKA_REPLICAS" \
+--set kafka.storeSize="$KAFKA_STORE_SIZE" \
+--set zookeeper.replicas="$ZOOKEEPER_REPLICAS" \
+--set postgresql.username="$POSTGRESQL_USERNAME" \
+--set postgresql.password="$POSTGRESQL_PASSWORD" \
+--set debeziumConnect.enabled=true \
+--set postgresqlConnector.enabled=true
+kubectl wait --for=condition=Ready kafkaconnect/debezium-connect-cluster -n kafka --timeout=300s
 
 section "Installing AKHQ"
 helm upgrade --install akhq akhq/akhq \
@@ -153,6 +170,10 @@ helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
 --set-string grafana.grafana\\.ini.database.user="$POSTGRESQL_USERNAME" \
 --set-string grafana.grafana\\.ini.database.password="$POSTGRESQL_PASSWORD" \
 --set grafana.assertNoLeakedSecrets=false
+wait_for_crd prometheuses.monitoring.coreos.com
+wait_for_crd servicemonitors.monitoring.coreos.com
+wait_for_crd podmonitors.monitoring.coreos.com
+wait_for_crd alertmanagers.monitoring.coreos.com
 
 section "Installing Grafana operator"
 helm upgrade --install grafana-operator oci://ghcr.io/grafana-operator/helm-charts/grafana-operator \

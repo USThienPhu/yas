@@ -5,6 +5,7 @@ postgresql:
   password: admin
 kafka:
   replicas: 1
+  storeSize: 5Gi
 zookeeper:
   replicas: 1
 elasticsearch:
