@@ -8,6 +8,17 @@ spec:
   replicas: 1
   bootstrapServers: kafka-cluster-kafka-bootstrap:9092
   image: {{ .Values.debeziumConnect.image }}
+  template:
+    pod:
+      volumes:
+        - name: debezium-connect-log4j
+          configMap:
+            name: debezium-connect-log4j
+    connectContainer:
+      volumeMounts:
+        - name: debezium-connect-log4j
+          mountPath: /opt/kafka/custom-config
+          readOnly: true
   config:
     config.providers: secrets
     config.providers.secrets.class: io.strimzi.kafka.KubernetesSecretConfigProvider
