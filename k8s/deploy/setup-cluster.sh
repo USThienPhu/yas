@@ -1,7 +1,31 @@
 #!/bin/bash
-set -x
+set -euo pipefail
 
-# Add chart repos and update
+section() {
+  printf '\n==> %s\n' "$1"
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1"
+    exit 1
+  fi
+}
+
+wait_for_crd() {
+  kubectl wait --for=condition=Established "crd/$1" --timeout=120s
+}
+
+require_command helm
+require_command kubectl
+require_command yq
+
+if ! yq --version | grep -qi "mikefarah\|version v4"; then
+  echo "This script requires Mike Farah yq v4. Install from https://github.com/mikefarah/yq"
+  exit 1
+fi
+
+section "Adding Helm repositories"
 helm repo add postgres-operator-charts https://opensource.zalando.com/postgres-operator/charts/postgres-operator
 helm repo add strimzi https://strimzi.io/charts/
 helm repo add akhq https://akhq.io/
@@ -12,35 +36,49 @@ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm
 helm repo add jetstack https://charts.jetstack.io
 helm repo update
 
-#Read configuration value from cluster-config.yaml file
-read -rd '' DOMAIN POSTGRESQL_REPLICAS POSTGRESQL_USERNAME POSTGRESQL_PASSWORD \
-KAFKA_REPLICAS ZOOKEEPER_REPLICAS ELASTICSEARCH_REPLICAES \
-GRAFANA_USERNAME GRAFANA_PASSWORD \
-< <(yq -r '.domain, .postgresql.replicas, .postgresql.username,
+section "Reading cluster configuration"
+mapfile -t config_values < <(yq -r '.domain, .postgresql.replicas, .postgresql.username,
  .postgresql.password, .kafka.replicas, .zookeeper.replicas,
  .elasticsearch.replicas, .grafana.username, .grafana.password' ./cluster-config.yaml)
+DOMAIN="${config_values[0]}"
+POSTGRESQL_REPLICAS="${config_values[1]}"
+POSTGRESQL_USERNAME="${config_values[2]}"
+POSTGRESQL_PASSWORD="${config_values[3]}"
+KAFKA_REPLICAS="${config_values[4]}"
+ZOOKEEPER_REPLICAS="${config_values[5]}"
+ELASTICSEARCH_REPLICAS="${config_values[6]}"
+GRAFANA_USERNAME="${config_values[7]}"
+GRAFANA_PASSWORD="${config_values[8]}"
 
-# Install the postgres-operator
+section "Installing PostgreSQL operator"
 helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator \
  --create-namespace --namespace postgres
+kubectl rollout status deployment/postgres-operator -n postgres --timeout=180s
+wait_for_crd postgresqls.acid.zalan.do
 
-#Install postgresql
+section "Installing PostgreSQL cluster"
 helm upgrade --install postgres ./postgres/postgresql \
 --create-namespace --namespace postgres \
 --set replicas="$POSTGRESQL_REPLICAS" \
 --set username="$POSTGRESQL_USERNAME" \
 --set password="$POSTGRESQL_PASSWORD"
 
-#Install pgadmin
-pg_admin_hostname="pgadmin.$DOMAIN" yq -i '.hostname=env(pg_admin_hostname)' ./postgres/pgadmin/values.yaml
+section "Installing pgAdmin"
 helm upgrade --install pgadmin ./postgres/pgadmin \
 --create-namespace --namespace postgres \
+--set-string hostname="pgadmin.$DOMAIN" \
+--set-string ingress.hosts[0].host="pgadmin.$DOMAIN"
 
-#Install strimzi-kafka-operator
+section "Installing Strimzi Kafka operator"
 helm upgrade --install kafka-operator strimzi/strimzi-kafka-operator \
---create-namespace --namespace kafka
+--create-namespace --namespace kafka \
+--version 0.47.0
+kubectl rollout status deployment/strimzi-cluster-operator -n kafka --timeout=180s
+wait_for_crd kafkas.kafka.strimzi.io
+wait_for_crd kafkaconnects.kafka.strimzi.io
+wait_for_crd kafkaconnectors.kafka.strimzi.io
 
-#Install kafka and postgresql connector
+section "Installing Kafka cluster and Debezium connector"
 helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
 --create-namespace --namespace kafka \
 --set kafka.replicas="$KAFKA_REPLICAS" \
@@ -48,33 +86,38 @@ helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
 --set postgresql.username="$POSTGRESQL_USERNAME" \
 --set postgresql.password="$POSTGRESQL_PASSWORD"
 
-#Install akhq
-akhq_hostname="akhq.$DOMAIN" yq -i '.hostname=env(akhq_hostname)' ./kafka/akhq.values.yaml
+section "Installing AKHQ"
 helm upgrade --install akhq akhq/akhq \
 --create-namespace --namespace kafka \
---values ./kafka/akhq.values.yaml
+--values ./kafka/akhq.values.yaml \
+--set-string hostname="akhq.$DOMAIN" \
+--set-string ingress.hosts[0]="akhq.$DOMAIN"
 
-#Install elastic-operator
+section "Installing Elastic operator"
 helm upgrade --install elastic-operator elastic/eck-operator \
  --create-namespace --namespace elasticsearch
+kubectl rollout status deployment/elastic-operator -n elasticsearch --timeout=180s
+wait_for_crd elasticsearches.elasticsearch.k8s.elastic.co
+wait_for_crd kibanas.kibana.k8s.elastic.co
 
-# Install elasticsearch-cluster
+section "Installing Elasticsearch and Kibana"
 helm upgrade --install elasticsearch-cluster ./elasticsearch/elasticsearch-cluster \
 --create-namespace --namespace elasticsearch \
---set elasticsearch.replicas="$ELASTICSEARCH_REPLICAES" \
+--set elasticsearch.replicas="$ELASTICSEARCH_REPLICAS" \
 --set kibana.ingress.hostname="kibana.$DOMAIN"
 
-#Install loki
+section "Installing Loki"
 helm upgrade --install loki grafana/loki \
  --create-namespace --namespace observability \
- -f ./observability/loki.values.yaml
+ -f ./observability/loki.values.yaml \
+ --set loki.useTestSchema=true
 
-#Install tempo
+section "Installing Tempo"
 helm upgrade --install tempo grafana/tempo \
 --create-namespace --namespace observability \
 -f ./observability/tempo.values.yaml
 
-#Install cert manager
+section "Installing cert-manager"
 helm upgrade --install cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
@@ -83,41 +126,52 @@ helm upgrade --install cert-manager jetstack/cert-manager \
   --set prometheus.enabled=false \
   --set webhook.timeoutSeconds=4 \
   --set admissionWebhooks.certManager.create=true
+kubectl rollout status deployment/cert-manager -n cert-manager --timeout=180s
+kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=180s
 
-#Install opentelemetry-operator
+section "Installing OpenTelemetry operator"
 helm upgrade --install opentelemetry-operator open-telemetry/opentelemetry-operator \
 --create-namespace --namespace observability
+kubectl rollout status deployment -l app.kubernetes.io/instance=opentelemetry-operator -n observability --timeout=180s
+wait_for_crd opentelemetrycollectors.opentelemetry.io
 
-#Install opentelemetry-collector
+section "Installing OpenTelemetry collector"
 helm upgrade --install opentelemetry-collector ./observability/opentelemetry \
 --create-namespace --namespace observability
 
-#Install promtail
+section "Installing Promtail"
 helm upgrade --install promtail grafana/promtail \
 --create-namespace --namespace observability \
 --values ./observability/promtail.values.yaml
 
-#Install prometheus + grafana
-grafana_hostname="grafana.$DOMAIN" yq -i '.hostname=env(grafana_hostname)' ./observability/prometheus.values.yaml
-postgresql_username="$POSTGRESQL_USERNAME" yq -i '.grafana."grafana.ini".database.user=env(postgresql_username)' ./observability/prometheus.values.yaml
-postgresql_password="$POSTGRESQL_PASSWORD" yq -i '.grafana."grafana.ini".database.password=env(postgresql_password)' ./observability/prometheus.values.yaml
+section "Installing Prometheus and bundled Grafana"
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
  --create-namespace --namespace observability \
 -f ./observability/prometheus.values.yaml \
+--set-string hostname="grafana.$DOMAIN" \
+--set-string grafana.ingress.hosts[0]="grafana.$DOMAIN" \
+--set-string grafana.grafana\\.ini.database.user="$POSTGRESQL_USERNAME" \
+--set-string grafana.grafana\\.ini.database.password="$POSTGRESQL_PASSWORD" \
+--set grafana.assertNoLeakedSecrets=false
 
-#Install grafana operator
+section "Installing Grafana operator"
 helm upgrade --install grafana-operator oci://ghcr.io/grafana-operator/helm-charts/grafana-operator \
 --version v5.0.2 \
 --create-namespace --namespace observability
+kubectl rollout status deployment -l app.kubernetes.io/instance=grafana-operator -n observability --timeout=180s
+wait_for_crd grafanas.grafana.integreatly.org
+wait_for_crd grafanadashboards.grafana.integreatly.org
+wait_for_crd grafanadatasources.grafana.integreatly.org
 
-#Add datasource and dashboard to grafana
+section "Installing Grafana dashboards and datasources"
 helm upgrade --install grafana ./observability/grafana \
 --create-namespace --namespace observability \
---set hotname="grafana.$DOMAIN" \
+--set hostname="grafana.$DOMAIN" \
 --set grafana.username="$GRAFANA_USERNAME" \
 --set grafana.password="$GRAFANA_PASSWORD" \
 --set postgresql.username="$POSTGRESQL_USERNAME" \
 --set postgresql.password="$POSTGRESQL_PASSWORD"
 
+section "Installing Zookeeper"
 helm upgrade --install zookeeper ./zookeeper \
  --namespace zookeeper --create-namespace

@@ -24,25 +24,25 @@ minikube addons enable ingress
 ```
 - Install helm
   https://helm.sh/
-- Install yq (the tool read, update yaml file)
+- Install Mike Farah yq v4 (the setup scripts validate this version before reading YAML)
   https://github.com/mikefarah/yq
-- Goto `k8s-deployment` folder
-- Execute [setup-keycloak.sh](setup-cluster.sh) to set up keycloak as the Identity and Access Management server.
-```shell
-./setup-keycloak.sh
-```
-- Execute [setup-redis.sh](setup-cluster.sh) to set up Redis as the server to store sessions for backends.
-```shell
-./setup-redis.sh
-```
+- Goto `k8s/deploy` folder
 - Execute [setup-cluster.sh](setup-cluster.sh) to set up severs: `postgresql`, `elasticsearch`, `kafka`, `debezium connect`
 ```shell
 ./setup-cluster.sh
 ```
+- Execute [setup-keycloak.sh](setup-keycloak.sh) to set up keycloak as the Identity and Access Management server.
+```shell
+./setup-keycloak.sh
+```
+- Execute [setup-redis.sh](setup-redis.sh) to set up Redis as the server to store sessions for backends.
+```shell
+./setup-redis.sh
+```
 - Verify all servers run successful on namespaces: `postgres`, `elasticsearch`, `kafka`, `keycloak`
 - After all above servers are running status, execute  [deploy-yas-applications.sh](deploy-yas-applications.sh) file to deploy all of yas applications to `yas` namespace
 ```shell
-./deploy-yas-applications
+./deploy-yas-applications.sh
 ```
 All of YAS microservice deployed in `yas` namespace
 - Setup hosts file
