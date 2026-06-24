@@ -100,7 +100,7 @@ helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
 --set postgresql.password="$POSTGRESQL_PASSWORD" \
 --set debeziumConnect.enabled=true \
 --set postgresqlConnector.enabled=true
-kubectl wait --for=condition=Ready kafkaconnect/debezium-connect-cluster -n kafka --timeout=300s
+kubectl wait --for=condition=Ready pod/debezium-connect-cluster-connect-0 -n kafka --timeout=300s
 
 section "Installing AKHQ"
 helm upgrade --install akhq akhq/akhq \
