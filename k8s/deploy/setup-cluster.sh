@@ -112,7 +112,7 @@ helm upgrade --install akhq akhq/akhq \
 section "Installing Elastic operator"
 helm upgrade --install elastic-operator elastic/eck-operator \
  --create-namespace --namespace elasticsearch
-kubectl rollout status deployment/elastic-operator -n elasticsearch --timeout=180s
+kubectl rollout status statefulset/elastic-operator -n elasticsearch --timeout=180s
 wait_for_crd elasticsearches.elasticsearch.k8s.elastic.co
 wait_for_crd kibanas.kibana.k8s.elastic.co
 
