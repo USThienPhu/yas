@@ -46,14 +46,17 @@ helm upgrade --install yas-configuration ../charts/yas-configuration \
 --set-string applicationConfig.spring.security.oauth2.resourceserver.jwt.jwk-set-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/certs" \
 --set-string applicationConfig.springdoc.oauthflow.authorization-url="$IDENTITY_URL/realms/Yas/protocol/openid-connect/auth" \
 --set-string applicationConfig.springdoc.oauthflow.token-url="$IDENTITY_URL/realms/Yas/protocol/openid-connect/token" \
+--set-string backofficeBffExtraConfig.spring.security.oauth2.client.provider.keycloak.issuer-uri="" \
 --set-string backofficeBffExtraConfig.spring.security.oauth2.client.provider.keycloak.authorization-uri="$IDENTITY_URL/realms/Yas/protocol/openid-connect/auth" \
 --set-string backofficeBffExtraConfig.spring.security.oauth2.client.provider.keycloak.token-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/token" \
 --set-string backofficeBffExtraConfig.spring.security.oauth2.client.provider.keycloak.jwk-set-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/certs" \
 --set-string backofficeBffExtraConfig.spring.security.oauth2.client.provider.keycloak.user-info-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/userinfo" \
+--set-string storefrontBffExtraConfig.spring.security.oauth2.client.provider.keycloak.issuer-uri="" \
 --set-string storefrontBffExtraConfig.spring.security.oauth2.client.provider.keycloak.authorization-uri="$IDENTITY_URL/realms/Yas/protocol/openid-connect/auth" \
 --set-string storefrontBffExtraConfig.spring.security.oauth2.client.provider.keycloak.token-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/token" \
 --set-string storefrontBffExtraConfig.spring.security.oauth2.client.provider.keycloak.jwk-set-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/certs" \
 --set-string storefrontBffExtraConfig.spring.security.oauth2.client.provider.keycloak.user-info-uri="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/userinfo" \
+--set-string storefrontBffExtraConfig.yas.services.token-identity="$KEYCLOAK_INTERNAL_REALM_URL/protocol/openid-connect/token" \
 --set-string customerApplicationConfig.keycloak.auth-server-url="$KEYCLOAK_INTERNAL_URL" \
 --set-string mediaApplicationConfig.yas.publicUrl="$API_URL/media" \
 --set-string paymentPaypalApplicationConfig.yas.public.url="$STOREFRONT_URL/complete-payment"

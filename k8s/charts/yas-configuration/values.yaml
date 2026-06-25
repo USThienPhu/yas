@@ -194,6 +194,7 @@ backofficeBffExtraConfig:
         client:
           provider:
             keycloak:
+              issuer-uri: ""
               authorization-uri: http://identity.yas.local.com/realms/Yas/protocol/openid-connect/auth
               token-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
               jwk-set-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/certs
@@ -217,16 +218,20 @@ storefrontBffExtraConfig:
         client:
           provider:
             keycloak:
+              issuer-uri: ""
               authorization-uri: http://identity.yas.local.com/realms/Yas/protocol/openid-connect/auth
               token-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
               jwk-set-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/certs
               user-info-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/userinfo
           registration:
-            api-client:
+            keycloak:
               provider: keycloak
               client-id: storefront-bff
               client-secret: ${KEYCLOAK_STOREFRONT_BFF_CLIENT_SECRET}
               scope: openid, profile, email, roles
+  yas:
+    services:
+      token-identity: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
 
 # Media application config custom
 mediaApplicationConfig:
