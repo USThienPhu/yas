@@ -97,84 +97,88 @@ gatewayRoutesConfig:
   spring:
     cloud:
       gateway:
-        routes:
-          - id: product_api
-            order: -10
-            uri: http://product
-            predicates:
-              - Path=/api/product/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: inventory_api
-            order: -10
-            uri: http://inventory
-            predicates:
-              - Path=/api/inventory/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: cart_api
-            order: -10
-            uri: http://cart
-            predicates:
-              - Path=/api/cart/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: customer_api
-            order: -10
-            uri: http://customer
-            predicates:
-              - Path=/api/customer/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: media_api
-            order: -10
-            uri: http://media
-            predicates:
-              - Path=/api/media/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: tax_api
-            order: -10
-            uri: http://tax
-            predicates:
-              - Path=/api/tax/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: search_api
-            order: -10
-            uri: http://search
-            predicates:
-              - Path=/api/search/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: order_api
-            order: -10
-            uri: http://order
-            predicates:
-              - Path=/api/order/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: sampledata_api
-            order: -10
-            uri: http://sampledata
-            predicates:
-              - Path=/api/sampledata/**
-            filters:
-              - RewritePath=/api/(?<segment>.*), /$\{segment}
-              - TokenRelay=
-          - id: ui
-            order: 1000
-            uri: ${UI_HOST}
-            predicates:
-              - Path=/**
+        server:
+          webflux:
+            default-filters:
+              - SaveSession
+            routes:
+              - id: product_api
+                order: -10
+                uri: http://product
+                predicates:
+                  - Path=/api/product/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: inventory_api
+                order: -10
+                uri: http://inventory
+                predicates:
+                  - Path=/api/inventory/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: cart_api
+                order: -10
+                uri: http://cart
+                predicates:
+                  - Path=/api/cart/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: customer_api
+                order: -10
+                uri: http://customer
+                predicates:
+                  - Path=/api/customer/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: media_api
+                order: -10
+                uri: http://media
+                predicates:
+                  - Path=/api/media/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: tax_api
+                order: -10
+                uri: http://tax
+                predicates:
+                  - Path=/api/tax/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: search_api
+                order: -10
+                uri: http://search
+                predicates:
+                  - Path=/api/search/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: order_api
+                order: -10
+                uri: http://order
+                predicates:
+                  - Path=/api/order/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: sampledata_api
+                order: -10
+                uri: http://sampledata
+                predicates:
+                  - Path=/api/sampledata/**
+                filters:
+                  - RewritePath=/api/(?<segment>.*), /$\{segment}
+                  - TokenRelay=
+              - id: ui
+                order: 1000
+                uri: ${UI_HOST}
+                predicates:
+                  - Path=/**
 
 backofficeBffExtraConfig:
   spring:
