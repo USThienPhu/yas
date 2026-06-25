@@ -22,5 +22,9 @@ ui:
   ingress:
     enabled: false
 
+legacyAlias:
+  enabled: true
+  name: storefront-nextjs
+
 #storefrontEnvProduction: |
 #  API_BASE_PATH=/api
