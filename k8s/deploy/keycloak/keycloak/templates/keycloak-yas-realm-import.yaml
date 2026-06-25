@@ -527,9 +527,12 @@ spec:
         secret: TVacLC0cQ8tiiEKiTVerTb2YvwQ1TRJF
         redirectUris:
           - {{ .Values.backofficeRedirectUrl }}/*
+          - {{ .Values.backofficeRedirectUrl }}:{{ .Values.externalAccessPort }}/*
           - http://localhost:3000/*
           - http://localhost:8087/*
-        webOrigins: [ ]
+        webOrigins:
+          - {{ .Values.backofficeRedirectUrl }}
+          - {{ .Values.backofficeRedirectUrl }}:{{ .Values.externalAccessPort }}
         notBefore: 0
         bearerOnly: false
         consentRequired: false
@@ -821,8 +824,11 @@ spec:
         secret: ZrU9I0q2uXBglBnmvyJdkl1lf0ncr8tn
         redirectUris:
           - {{ .Values.storefrontRedirectUrl }}/*
+          - {{ .Values.storefrontRedirectUrl }}:{{ .Values.externalAccessPort }}/*
           - http://localhost:8087/*
-        webOrigins: [ ]
+        webOrigins:
+          - {{ .Values.storefrontRedirectUrl }}
+          - {{ .Values.storefrontRedirectUrl }}:{{ .Values.externalAccessPort }}
         notBefore: 0
         bearerOnly: false
         consentRequired: false

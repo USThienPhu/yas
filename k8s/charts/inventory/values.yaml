@@ -7,4 +7,6 @@ backend:
   fullnameOverride: inventory
   databaseName: inventory
   ingress:
-    enabled: false
+    enabled: true
+    host: api.yas.local.com
+    path: /inventory

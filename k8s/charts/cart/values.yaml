@@ -7,7 +7,9 @@ backend:
   fullnameOverride: cart
   databaseName: cart
   ingress:
-    enabled: false
+    enabled: true
+    host: api.yas.local.com
+    path: /cart
   extraVolumes:
     - name: cart-application-config
       configMap:

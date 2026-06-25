@@ -7,7 +7,9 @@ backend:
   fullnameOverride: customer
   databaseName: customer
   ingress:
-    enabled: false
+    enabled: true
+    host: api.yas.local.com
+    path: /customer
   extraEnvFroms:
     - secretRef:
         name: yas-keycloak-credentials-secret

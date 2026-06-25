@@ -7,7 +7,9 @@ backend:
   fullnameOverride: media
   databaseName: media
   ingress:
-    enabled: false
+    enabled: true
+    host: api.yas.local.com
+    path: /media
   extraVolumes:
     - name: media-application
       configMap:

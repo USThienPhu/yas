@@ -7,4 +7,6 @@ backend:
   fullnameOverride: tax
   databaseName: tax
   ingress:
-    enabled: false
+    enabled: true
+    host: api.yas.local.com
+    path: /tax

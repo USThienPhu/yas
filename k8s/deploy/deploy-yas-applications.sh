@@ -35,8 +35,7 @@ helm upgrade --install backoffice-ui ../charts/backoffice-ui \
 helm dependency build ../charts/backoffice-bff
 helm upgrade --install backoffice-bff ../charts/backoffice-bff \
 --namespace yas --create-namespace \
---set backend.ingress.host="backoffice.$DOMAIN" \
---set-string backend.extraEnvs[1].value="http://backoffice-ui.yas.svc.cluster.local:3000"
+--set backend.ingress.host="backoffice.$DOMAIN"
 
 helm dependency build ../charts/storefront-ui
 helm upgrade --install storefront-ui ../charts/storefront-ui \
@@ -47,8 +46,7 @@ sleep 60
 helm dependency build ../charts/storefront-bff
 helm upgrade --install storefront-bff ../charts/storefront-bff \
 --namespace yas --create-namespace \
---set backend.ingress.host="storefront.$DOMAIN" \
---set-string backend.extraEnvs[1].value="http://storefront-ui.yas.svc.cluster.local:3000"
+--set backend.ingress.host="storefront.$DOMAIN"
 
 sleep 60
 

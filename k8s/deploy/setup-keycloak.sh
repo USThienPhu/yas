@@ -25,7 +25,8 @@ fi
 mapfile -t config_values < <(yq -r '.domain,
   .postgresql.username, .postgresql.password,
   .keycloak.bootstrapAdmin.username, .keycloak.bootstrapAdmin.password,
-  .keycloak.backofficeRedirectUrl, .keycloak.storefrontRedirectUrl' ./cluster-config.yaml)
+  .keycloak.backofficeRedirectUrl, .keycloak.storefrontRedirectUrl,
+  .keycloak.externalAccessPort' ./cluster-config.yaml)
 DOMAIN="${config_values[0]}"
 POSTGRESQL_USERNAME="${config_values[1]}"
 POSTGRESQL_PASSWORD="${config_values[2]}"
@@ -33,6 +34,7 @@ BOOTSTRAP_ADMIN_USERNAME="${config_values[3]}"
 BOOTSTRAP_ADMIN_PASSWORD="${config_values[4]}"
 KEYCLOAK_BACKOFFICE_REDIRECT_URL="${config_values[5]}"
 KEYCLOAK_STOREFRONT_REDIRECT_URL="${config_values[6]}"
+KEYCLOAK_EXTERNAL_ACCESS_PORT="${config_values[7]}"
 
 #Install CRD keycloak
 kubectl create namespace keycloak --dry-run=client -o yaml | kubectl apply -f -
@@ -52,5 +54,6 @@ helm upgrade --install keycloak ./keycloak/keycloak \
 --set bootstrapAdmin.username="$BOOTSTRAP_ADMIN_USERNAME" \
 --set bootstrapAdmin.password="$BOOTSTRAP_ADMIN_PASSWORD" \
 --set backofficeRedirectUrl="$KEYCLOAK_BACKOFFICE_REDIRECT_URL" \
---set storefrontRedirectUrl="$KEYCLOAK_STOREFRONT_REDIRECT_URL"
+--set storefrontRedirectUrl="$KEYCLOAK_STOREFRONT_REDIRECT_URL" \
+--set externalAccessPort="$KEYCLOAK_EXTERNAL_ACCESS_PORT"
 kubectl wait --for=condition=Ready keycloak/keycloak -n keycloak --timeout=300s

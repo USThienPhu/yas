@@ -1,6 +1,7 @@
 hostname: identity.yas.local.com
 backofficeRedirectUrl: http://backoffice.yas.local.com
 storefrontRedirectUrl: http://storefront.yas.local.com
+externalAccessPort: 18080
 postgresql:
   username: yasadminuser
   password: admin
