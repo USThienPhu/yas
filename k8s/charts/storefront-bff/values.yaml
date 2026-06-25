@@ -17,7 +17,7 @@ backend:
 
   extraEnvs:
     - name: SPRING_PROFILES_ACTIVE
-      value: prod
+      value: k8s
     - name: UI_HOST
       value: http://storefront-ui.yas.svc.cluster.local:3000
   extraEnvFroms:
