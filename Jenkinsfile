@@ -13,7 +13,7 @@ pipeline {
 
     environment {
         // THAY ĐỔI: Nhập đúng Username Docker Hub của bạn vào đây
-        DOCKER_HUB_USER = 'your_dockerhub_username' 
+        DOCKER_HUB_USER = 'thaithienphu' 
         // ID credentials đã tạo ở Bước 2
         DOCKER_HUB_CREDS = 'docker-hub-credentials' 
         IMAGE_NAME = "${env.DOCKER_HUB_USER}/${params.SERVICE_NAME}"
