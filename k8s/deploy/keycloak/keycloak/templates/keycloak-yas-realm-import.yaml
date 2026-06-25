@@ -1,3 +1,12 @@
+{{- $externalPort := toString (.Values.externalAccessPort | default "80") -}}
+{{- $backofficeExternalUrl := .Values.backofficeRedirectUrl -}}
+{{- $storefrontExternalUrl := .Values.storefrontRedirectUrl -}}
+{{- $apiExternalUrl := .Values.apiRedirectUrl -}}
+{{- if and $externalPort (ne $externalPort "80") -}}
+{{- $backofficeExternalUrl = printf "%s:%s" .Values.backofficeRedirectUrl $externalPort -}}
+{{- $storefrontExternalUrl = printf "%s:%s" .Values.storefrontRedirectUrl $externalPort -}}
+{{- $apiExternalUrl = printf "%s:%s" .Values.apiRedirectUrl $externalPort -}}
+{{- end -}}
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: KeycloakRealmImport
 metadata:
@@ -526,13 +535,17 @@ spec:
         clientAuthenticatorType: client-secret
         secret: TVacLC0cQ8tiiEKiTVerTb2YvwQ1TRJF
         redirectUris:
-          - {{ .Values.backofficeRedirectUrl }}/*
-          - {{ .Values.backofficeRedirectUrl }}:{{ .Values.externalAccessPort }}/*
+          - {{ printf "%s/*" .Values.backofficeRedirectUrl | quote }}
+{{ if ne $externalPort "80" }}
+          - {{ printf "%s/*" $backofficeExternalUrl | quote }}
+{{ end }}
           - http://localhost:3000/*
           - http://localhost:8087/*
         webOrigins:
-          - {{ .Values.backofficeRedirectUrl }}
-          - {{ .Values.backofficeRedirectUrl }}:{{ .Values.externalAccessPort }}
+          - {{ .Values.backofficeRedirectUrl | quote }}
+{{ if ne $externalPort "80" }}
+          - {{ $backofficeExternalUrl | quote }}
+{{ end }}
         notBefore: 0
         bearerOnly: false
         consentRequired: false
@@ -823,12 +836,16 @@ spec:
         clientAuthenticatorType: client-secret
         secret: ZrU9I0q2uXBglBnmvyJdkl1lf0ncr8tn
         redirectUris:
-          - {{ .Values.storefrontRedirectUrl }}/*
-          - {{ .Values.storefrontRedirectUrl }}:{{ .Values.externalAccessPort }}/*
+          - {{ printf "%s/*" .Values.storefrontRedirectUrl | quote }}
+{{ if ne $externalPort "80" }}
+          - {{ printf "%s/*" $storefrontExternalUrl | quote }}
+{{ end }}
           - http://localhost:8087/*
         webOrigins:
-          - {{ .Values.storefrontRedirectUrl }}
-          - {{ .Values.storefrontRedirectUrl }}:{{ .Values.externalAccessPort }}
+          - {{ .Values.storefrontRedirectUrl | quote }}
+{{ if ne $externalPort "80" }}
+          - {{ $storefrontExternalUrl | quote }}
+{{ end }}
         notBefore: 0
         bearerOnly: false
         consentRequired: false
@@ -939,7 +956,10 @@ spec:
         alwaysDisplayInConsole: false
         clientAuthenticatorType: client-secret
         redirectUris:
-          - http://api.yas.local.com/*
+          - {{ printf "%s/*" .Values.apiRedirectUrl | quote }}
+{{ if ne $externalPort "80" }}
+          - {{ printf "%s/*" $apiExternalUrl | quote }}
+{{ end }}
           - http://localhost:8080/*
           - http://localhost:8081/*
           - http://localhost:8083/*
@@ -953,7 +973,10 @@ spec:
           - http://localhost:8092/*
           - http://localhost:8093/*
         webOrigins:
-          - http://api.yas.local.com
+          - {{ .Values.apiRedirectUrl | quote }}
+{{ if ne $externalPort "80" }}
+          - {{ $apiExternalUrl | quote }}
+{{ end }}
           - http://localhost:8080
           - http://localhost:8081
           - http://localhost:8083

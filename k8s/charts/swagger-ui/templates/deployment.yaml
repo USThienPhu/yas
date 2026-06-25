@@ -1,3 +1,5 @@
+{{- $apiBaseUrl := trimSuffix "/" (.Values.apiBaseUrl | default "http://api.yas.local.com") -}}
+{{- $defaultUrls := printf "[{ url: '%s/product/v3/api-docs', name: 'Product' }, { url: '%s/media/v3/api-docs', name: 'Media' }, { url: '%s/customer/v3/api-docs', name: 'Customer' }, { url: '%s/cart/v3/api-docs', name: 'Cart'}, { url: '%s/order/v3/api-docs', name: 'Order'}, { url: '%s/inventory/v3/api-docs', name: 'Inventory'}, { url: '%s/tax/v3/api-docs', name: 'Tax' }, { url: '%s/search/v3/api-docs', name: 'Search'}, { url: '%s/sampledata/v3/api-docs', name: 'Sample Data'}]" $apiBaseUrl $apiBaseUrl $apiBaseUrl $apiBaseUrl $apiBaseUrl $apiBaseUrl $apiBaseUrl $apiBaseUrl $apiBaseUrl -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,7 +39,7 @@ spec:
             - name: BASE_URL
               value: {{ .Values.baseUrl }}
             - name: URLS
-              value: {{ .Values.urls | quote }}
+              value: {{ (.Values.urls | default $defaultUrls) | quote }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

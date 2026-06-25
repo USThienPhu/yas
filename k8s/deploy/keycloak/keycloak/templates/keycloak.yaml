@@ -1,3 +1,8 @@
+{{- $externalPort := toString (.Values.externalAccessPort | default "80") -}}
+{{- $externalHostname := printf "http://%s" .Values.hostname -}}
+{{- if and $externalPort (ne $externalPort "80") -}}
+{{- $externalHostname = printf "%s:%s" $externalHostname $externalPort -}}
+{{- end -}}
 apiVersion: k8s.keycloak.org/v2alpha1
 kind: Keycloak
 metadata:
@@ -21,7 +26,7 @@ spec:
     httpEnabled: true
     httpPort: 80
   hostname:
-    hostname: http://{{ .Values.hostname }}
+    hostname: {{ $externalHostname | quote }}
     backchannelDynamic: true
     strict: false
   proxy:

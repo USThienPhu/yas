@@ -49,6 +49,7 @@ kubectl rollout status deployment/keycloak-operator -n keycloak --timeout=180s
 helm upgrade --install keycloak ./keycloak/keycloak \
 --namespace keycloak \
 --set hostname="identity.$DOMAIN" \
+--set apiRedirectUrl="http://api.$DOMAIN" \
 --set postgresql.username="$POSTGRESQL_USERNAME" \
 --set postgresql.password="$POSTGRESQL_PASSWORD" \
 --set bootstrapAdmin.username="$BOOTSTRAP_ADMIN_USERNAME" \

@@ -19,6 +19,7 @@ keycloak:
   backofficeRedirectUrl: http://backoffice.yas.local.com
   storefrontRedirectUrl: http://storefront.yas.local.com
   externalAccessPort: 18080
+  internalBaseUrl: http://keycloak-service.keycloak
 grafana:
   username: admin
   password: admin

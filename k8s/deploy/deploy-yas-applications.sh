@@ -27,6 +27,18 @@ helm repo add stakater https://stakater.github.io/stakater-charts
 helm repo update
 
 DOMAIN="$(yq -r '.domain' ./cluster-config.yaml)"
+EXTERNAL_ACCESS_PORT="$(yq -r '.keycloak.externalAccessPort // 80' ./cluster-config.yaml)"
+
+external_url() {
+  local host="$1"
+  if [[ "$EXTERNAL_ACCESS_PORT" == "80" || "$EXTERNAL_ACCESS_PORT" == "null" ]]; then
+    printf "http://%s" "$host"
+  else
+    printf "http://%s:%s" "$host" "$EXTERNAL_ACCESS_PORT"
+  fi
+}
+
+API_URL="$(external_url "api.$DOMAIN")"
 
 helm dependency build ../charts/backoffice-ui
 helm upgrade --install backoffice-ui ../charts/backoffice-ui \
@@ -52,7 +64,8 @@ sleep 60
 
 helm upgrade --install swagger-ui ../charts/swagger-ui \
 --namespace yas --create-namespace \
---set ingress.host="api.$DOMAIN"
+--set ingress.host="api.$DOMAIN" \
+--set-string apiBaseUrl="$API_URL"
 
 sleep 20
 

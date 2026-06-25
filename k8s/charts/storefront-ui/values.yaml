@@ -18,7 +18,7 @@ ui:
 #      subPath: .env.production
   extraEnvs:
     - name: API_BASE_PATH
-      value: /api
+      value: http://storefront-bff.yas.svc.cluster.local/api
   ingress:
     enabled: false
 
@@ -27,4 +27,4 @@ legacyAlias:
   name: storefront-nextjs
 
 #storefrontEnvProduction: |
-#  API_BASE_PATH=/api
+#  API_BASE_PATH=http://storefront-bff.yas.svc.cluster.local/api
