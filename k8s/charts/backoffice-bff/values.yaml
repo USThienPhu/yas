@@ -5,6 +5,7 @@ backend:
 
   nameOverride: backoffice-bff
   fullnameOverride: backoffice-bff
+  replaceDefaultApplicationConfig: true
   deployment:
     annotations:
       configmap.reloader.stakater.com/reload: "yas-gateway-routes-config-configmap,backoffice-bff-extra-configmap"
@@ -13,6 +14,8 @@ backend:
     host: backoffice.yas.local.com
     path: /
   extraEnvs:
+    - name: SPRING_APPLICATION_NAME
+      value: backoffice-bff
     - name: SPRING_PROFILES_ACTIVE
       value: k8s
     - name: UI_HOST

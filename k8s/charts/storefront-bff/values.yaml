@@ -5,6 +5,7 @@ backend:
 
   nameOverride: storefront-bff
   fullnameOverride: storefront-bff
+  replaceDefaultApplicationConfig: true
 
   deployment:
     annotations:
@@ -16,6 +17,8 @@ backend:
     path: /
 
   extraEnvs:
+    - name: SPRING_APPLICATION_NAME
+      value: storefront-bff
     - name: SPRING_PROFILES_ACTIVE
       value: k8s
     - name: UI_HOST

@@ -81,6 +81,8 @@ extraVolumeMounts: []
 extraApplicationConfigPaths: []
 #  - /opt/config/application-example.yaml
 
+replaceDefaultApplicationConfig: false
+
 lifecycle:
   preStop:
     exec:
