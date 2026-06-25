@@ -47,6 +47,7 @@ kubectl rollout status deployment/keycloak-operator -n keycloak --timeout=180s
 
 # Install keycloak
 helm upgrade --install keycloak ./keycloak/keycloak \
+--reset-values \
 --namespace keycloak \
 --set hostname="identity.$DOMAIN" \
 --set apiRedirectUrl="http://api.$DOMAIN" \

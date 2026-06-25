@@ -19,6 +19,7 @@ fi
 #Read configuration value from cluster-config.yaml file
 REDIS_PASSWORD="$(yq -r '.redis.password' ./cluster-config.yaml)"
 
-helm upgrade --install redis \
-  --set auth.password="$REDIS_PASSWORD" \
-  oci://registry-1.docker.io/bitnamicharts/redis -n redis --create-namespace
+helm upgrade --install redis oci://registry-1.docker.io/bitnamicharts/redis \
+  --reset-values \
+  --namespace redis --create-namespace \
+  --set auth.password="$REDIS_PASSWORD"

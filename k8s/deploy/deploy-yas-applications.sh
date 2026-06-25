@@ -42,27 +42,32 @@ API_URL="$(external_url "api.$DOMAIN")"
 
 helm dependency build ../charts/backoffice-ui
 helm upgrade --install backoffice-ui ../charts/backoffice-ui \
+--reset-values \
 --namespace yas --create-namespace
 
 helm dependency build ../charts/backoffice-bff
 helm upgrade --install backoffice-bff ../charts/backoffice-bff \
+--reset-values \
 --namespace yas --create-namespace \
 --set backend.ingress.host="backoffice.$DOMAIN"
 
 helm dependency build ../charts/storefront-ui
 helm upgrade --install storefront-ui ../charts/storefront-ui \
+--reset-values \
 --namespace yas --create-namespace
 
 sleep 60
 
 helm dependency build ../charts/storefront-bff
 helm upgrade --install storefront-bff ../charts/storefront-bff \
+--reset-values \
 --namespace yas --create-namespace \
 --set backend.ingress.host="storefront.$DOMAIN"
 
 sleep 60
 
 helm upgrade --install swagger-ui ../charts/swagger-ui \
+--reset-values \
 --namespace yas --create-namespace \
 --set ingress.host="api.$DOMAIN" \
 --set-string apiBaseUrl="$API_URL"
@@ -72,6 +77,7 @@ sleep 20
 for chart in {"product","cart","order","customer","inventory","tax","media","search","sampledata"} ; do
     helm dependency build ../charts/"$chart"
     helm upgrade --install "$chart" ../charts/"$chart" \
+    --reset-values \
     --namespace yas --create-namespace \
     --set backend.ingress.host="api.$DOMAIN"
     sleep 60

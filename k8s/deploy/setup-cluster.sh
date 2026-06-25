@@ -68,12 +68,14 @@ GRAFANA_PASSWORD="${config_values[9]}"
 
 section "Installing PostgreSQL operator"
 helm upgrade --install postgres-operator postgres-operator-charts/postgres-operator \
+ --reset-values \
  --create-namespace --namespace postgres
 kubectl rollout status deployment/postgres-operator -n postgres --timeout=180s
 wait_for_crd postgresqls.acid.zalan.do
 
 section "Installing PostgreSQL cluster"
 helm upgrade --install postgres ./postgres/postgresql \
+--reset-values \
 --create-namespace --namespace postgres \
 --set replicas="$POSTGRESQL_REPLICAS" \
 --set username="$POSTGRESQL_USERNAME" \
@@ -81,11 +83,13 @@ helm upgrade --install postgres ./postgres/postgresql \
 
 section "Installing pgAdmin"
 helm upgrade --install pgadmin ./postgres/pgadmin \
+--reset-values \
 --create-namespace --namespace postgres \
 --set-string hostname="pgadmin.$DOMAIN"
 
 section "Installing Strimzi Kafka operator"
 helm upgrade --install kafka-operator strimzi/strimzi-kafka-operator \
+--reset-values \
 --create-namespace --namespace kafka \
 --version 0.45.0 \
 --set resources.requests.memory=512Mi \
@@ -97,6 +101,7 @@ wait_for_crd kafkaconnectors.kafka.strimzi.io
 
 section "Installing Kafka cluster"
 helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
+--reset-values \
 --create-namespace --namespace kafka \
 --set kafka.replicas="$KAFKA_REPLICAS" \
 --set kafka.storeSize="$KAFKA_STORE_SIZE" \
@@ -109,6 +114,7 @@ kubectl wait --for=condition=Ready kafka/kafka-cluster -n kafka --timeout=600s
 
 section "Installing Debezium Kafka Connect and PostgreSQL connector"
 helm upgrade --install kafka-cluster ./kafka/kafka-cluster \
+--reset-values \
 --create-namespace --namespace kafka \
 --set kafka.replicas="$KAFKA_REPLICAS" \
 --set kafka.storeSize="$KAFKA_STORE_SIZE" \
@@ -121,6 +127,7 @@ wait_for_pod_ready kafka debezium-connect-cluster-connect-0
 
 section "Installing AKHQ"
 helm upgrade --install akhq akhq/akhq \
+--reset-values \
 --create-namespace --namespace kafka \
 --values ./kafka/akhq.values.yaml \
 --set-string hostname="akhq.$DOMAIN" \
@@ -128,6 +135,7 @@ helm upgrade --install akhq akhq/akhq \
 
 section "Installing Elastic operator"
 helm upgrade --install elastic-operator elastic/eck-operator \
+ --reset-values \
  --create-namespace --namespace elasticsearch
 kubectl rollout status statefulset/elastic-operator -n elasticsearch --timeout=180s
 wait_for_crd elasticsearches.elasticsearch.k8s.elastic.co
@@ -135,23 +143,27 @@ wait_for_crd kibanas.kibana.k8s.elastic.co
 
 section "Installing Elasticsearch and Kibana"
 helm upgrade --install elasticsearch-cluster ./elasticsearch/elasticsearch-cluster \
+--reset-values \
 --create-namespace --namespace elasticsearch \
 --set elasticsearch.replicas="$ELASTICSEARCH_REPLICAS" \
 --set kibana.ingress.hostname="kibana.$DOMAIN"
 
 section "Installing Loki"
 helm upgrade --install loki grafana/loki \
+ --reset-values \
  --create-namespace --namespace observability \
  -f ./observability/loki.values.yaml \
  --set loki.useTestSchema=true
 
 section "Installing Tempo"
 helm upgrade --install tempo grafana/tempo \
+--reset-values \
 --create-namespace --namespace observability \
 -f ./observability/tempo.values.yaml
 
 section "Installing cert-manager"
 helm upgrade --install cert-manager jetstack/cert-manager \
+  --reset-values \
   --namespace cert-manager \
   --create-namespace \
   --version v1.12.0 \
@@ -164,21 +176,25 @@ kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout
 
 section "Installing OpenTelemetry operator"
 helm upgrade --install opentelemetry-operator open-telemetry/opentelemetry-operator \
+--reset-values \
 --create-namespace --namespace observability
 kubectl rollout status deployment -l app.kubernetes.io/instance=opentelemetry-operator -n observability --timeout=180s
 wait_for_crd opentelemetrycollectors.opentelemetry.io
 
 section "Installing OpenTelemetry collector"
 helm upgrade --install opentelemetry-collector ./observability/opentelemetry \
+--reset-values \
 --create-namespace --namespace observability
 
 section "Installing Promtail"
 helm upgrade --install promtail grafana/promtail \
+--reset-values \
 --create-namespace --namespace observability \
 --values ./observability/promtail.values.yaml
 
 section "Installing Prometheus and bundled Grafana"
 helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+ --reset-values \
  --create-namespace --namespace observability \
 -f ./observability/prometheus.values.yaml \
 --set-string hostname="grafana.$DOMAIN" \
@@ -193,6 +209,7 @@ wait_for_crd alertmanagers.monitoring.coreos.com
 
 section "Installing Grafana operator"
 helm upgrade --install grafana-operator oci://ghcr.io/grafana-operator/helm-charts/grafana-operator \
+--reset-values \
 --version v5.0.2 \
 --create-namespace --namespace observability
 kubectl rollout status deployment -l app.kubernetes.io/instance=grafana-operator -n observability --timeout=180s
@@ -202,6 +219,7 @@ wait_for_crd grafanadatasources.grafana.integreatly.org
 
 section "Installing Grafana dashboards and datasources"
 helm upgrade --install grafana ./observability/grafana \
+--reset-values \
 --create-namespace --namespace observability \
 --set hostname="grafana.$DOMAIN" \
 --set grafana.username="$GRAFANA_USERNAME" \
@@ -211,4 +229,5 @@ helm upgrade --install grafana ./observability/grafana \
 
 section "Installing Zookeeper"
 helm upgrade --install zookeeper ./zookeeper \
+ --reset-values \
  --namespace zookeeper --create-namespace

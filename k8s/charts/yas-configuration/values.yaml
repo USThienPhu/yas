@@ -68,6 +68,8 @@ applicationConfig:
       bootstrap-servers: kafka-cluster-kafka-brokers.kafka:9092
       consumer:
         bootstrap-servers: kafka-cluster-kafka-brokers.kafka:9092
+      producer:
+        bootstrap-servers: kafka-cluster-kafka-brokers.kafka:9092
 
   springdoc:
     oauthflow:
@@ -192,7 +194,10 @@ backofficeBffExtraConfig:
         client:
           provider:
             keycloak:
-              issuer-uri: http://identity.yas.local.com/realms/Yas
+              authorization-uri: http://identity.yas.local.com/realms/Yas/protocol/openid-connect/auth
+              token-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
+              jwk-set-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/certs
+              user-info-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/userinfo
           registration:
             api-client:
               provider: keycloak
@@ -212,7 +217,10 @@ storefrontBffExtraConfig:
         client:
           provider:
             keycloak:
-              issuer-uri: http://identity.yas.local.com/realms/Yas
+              authorization-uri: http://identity.yas.local.com/realms/Yas/protocol/openid-connect/auth
+              token-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
+              jwk-set-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/certs
+              user-info-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/userinfo
           registration:
             api-client:
               provider: keycloak
@@ -240,7 +248,7 @@ customerApplicationConfig:
 # Search application config custom
 searchApplicationConfig:
   elasticsearch:
-    url: elasticsearch-es-http.elasticsearch
+    url: elasticsearch-es-http.elasticsearch:9200
     username: ${ELASTICSEARCH_USERNAME}
     password: ${ELASTICSEARCH_PASSWORD}
 
