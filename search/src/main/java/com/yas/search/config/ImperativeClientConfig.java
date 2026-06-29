@@ -7,6 +7,14 @@ import org.springframework.data.elasticsearch.client.ClientConfiguration;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchConfiguration;
 import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
+import java.time.Duration;
+
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "com.yas.search.repository")
 @ComponentScan(basePackages = "com.yas.search.service")
@@ -18,8 +26,32 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
     @Override
     public ClientConfiguration clientConfiguration() {
         return ClientConfiguration.builder()
-                .connectedTo(elasticsearchConfig.getUrl())
+                .connectedTo(elasticsearchConfig.getUrl()
+                        .replace("https://", "")
+                        .replace("http://", ""))
+                .usingSsl(trustAllSslContext())
                 .withBasicAuth(elasticsearchConfig.getUsername(), elasticsearchConfig.getPassword())
+                .withConnectTimeout(Duration.ofSeconds(10))
+                .withSocketTimeout(Duration.ofSeconds(30))
                 .build();
+    }
+
+    /**
+     * Creates a trust-all SSLContext to bypass certificate verification.
+     * ECK generates a self-signed certificate which would otherwise fail validation.
+     * NOTE: Only use this in non-production / internal cluster environments.
+     */
+    private SSLContext trustAllSslContext() {
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, new TrustManager[]{new X509TrustManager() {
+                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+                public void checkClientTrusted(X509Certificate[] certs, String authType) {}
+                public void checkServerTrusted(X509Certificate[] certs, String authType) {}
+            }}, null);
+            return sslContext;
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            throw new RuntimeException("Failed to create trust-all SSL context", e);
+        }
     }
 }
