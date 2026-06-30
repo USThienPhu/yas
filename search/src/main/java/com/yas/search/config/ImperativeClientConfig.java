@@ -25,11 +25,19 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
 
     @Override
     public ClientConfiguration clientConfiguration() {
-        return ClientConfiguration.builder()
+        var builder = ClientConfiguration.builder()
                 .connectedTo(elasticsearchConfig.getUrl()
                         .replace("https://", "")
-                        .replace("http://", ""))
-                .usingSsl(trustAllSslContext())
+                        .replace("http://", ""));
+
+        ClientConfiguration.TerminalClientConfigurationBuilder terminalBuilder;
+        if (elasticsearchConfig.getUrl() != null && elasticsearchConfig.getUrl().startsWith("https://")) {
+            terminalBuilder = builder.usingSsl(trustAllSslContext());
+        } else {
+            terminalBuilder = builder;
+        }
+
+        return terminalBuilder
                 .withBasicAuth(elasticsearchConfig.getUsername(), elasticsearchConfig.getPassword())
                 .withConnectTimeout(Duration.ofSeconds(10))
                 .withSocketTimeout(Duration.ofSeconds(30))
