@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     // ==========================================================================
-    // Tự động trigger khi có git push lên bất kỳ branch nào (Requirement 3)
-    // Yêu cầu: cài plugin "GitHub Integration" hoặc "Generic Webhook Trigger"
-    //          và cấu hình Webhook trên GitHub/GitLab trỏ về Jenkins
+    // Auto-trigger on every git push to any branch (Requirement 3)
+    // Requires: "GitHub Integration" or "Generic Webhook Trigger" plugin
+    //           and a Webhook configured on GitHub/GitLab pointing to Jenkins
     // ==========================================================================
     triggers {
         githubPush()
@@ -14,8 +14,8 @@ pipeline {
         DOCKER_HUB_USER  = 'thaithienphu'
         DOCKER_HUB_CREDS = 'docker-hub-credentials'
 
-        // Lấy 7 ký tự đầu của commit SHA làm image tag (ví dụ: abc1234)
-        // Nếu là nhánh main thì dùng "latest", ngược lại dùng commit SHA
+        // Take first 7 characters of commit SHA as image tag (e.g. abc1234)
+        // If on main branch → use "latest", otherwise use commit SHA
         COMMIT_SHA = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
         IMAGE_TAG  = "${env.BRANCH_NAME == 'main' ? 'latest' : env.COMMIT_SHA}"
     }
@@ -23,9 +23,9 @@ pipeline {
     stages {
 
         // ----------------------------------------------------------------------
-        // Stage 1: In thông tin để dễ debug trên Jenkins console
+        // Stage 1: Print pipeline info for easy debugging in Jenkins console
         // ----------------------------------------------------------------------
-        stage('Thông tin Pipeline') {
+        stage('Pipeline Info') {
             steps {
                 echo "======================================================"
                 echo " Branch    : ${env.BRANCH_NAME}"
@@ -37,34 +37,34 @@ pipeline {
         }
 
         // ----------------------------------------------------------------------
-        // Stage 2: Detect service thay đổi dựa trên git diff
-        // Chỉ build service nào có file thay đổi trong commit này
+        // Stage 2: Detect which services changed based on git diff
+        // Only build services that have file changes in this commit
         // ----------------------------------------------------------------------
         stage('Detect Changed Services') {
             steps {
                 script {
                     def allServices = [
                         // Backend services
-                        'product',        // Sản phẩm — trung tâm của shop
-                        'cart',           // Giỏ hàng
-                        'order',          // Đơn hàng — test retry policy
-                        'customer',       // Thông tin khách hàng
-                        'inventory',      // Kho hàng
-                        'tax',            // Thuế — demo VirtualService retry
-                        'media',          // Upload hình ảnh
-                        'search',         // Tìm kiếm — demo AuthorizationPolicy
+                        'product',        // Product catalog — core of the shop
+                        'cart',           // Shopping cart
+                        'order',          // Order management — test retry policy
+                        'customer',       // Customer information
+                        'inventory',      // Inventory — order dependency
+                        'tax',            // Tax — demo VirtualService retry
+                        'media',          // Product image upload
+                        'search',         // Search — demo AuthorizationPolicy
                         // BFF services
-                        'storefront-bff', // BFF cho giao diện người dùng
-                        'backoffice-bff', // BFF cho quản trị
-                        // UI services (folder name ≠ service name)
-                        'storefront',     // → storefront-ui (giao diện cửa hàng)
-                        'backoffice',     // → backoffice-ui (giao diện quản trị)
-                        // Data seeding — chỉ chạy 1 lần sau khi deploy
+                        'storefront-bff', // BFF for storefront UI
+                        'backoffice-bff', // BFF for backoffice UI
+                        // UI services (folder name differs from service name)
+                        'storefront',     // → storefront-ui (customer-facing shop)
+                        'backoffice',     // → backoffice-ui (admin panel)
+                        // Data seeding — run once after initial deploy
                         'sampledata'
-                        // ❌ swagger-ui → dùng public image swaggerapi/swagger-ui, không cần build
+                        // swagger-ui → uses public image swaggerapi/swagger-ui, no build needed
                     ]
 
-                    // Lấy danh sách file thay đổi so với commit trước
+                    // Get list of files changed compared to previous commit
                     def changedFiles = sh(
                         script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD',
                         returnStdout: true
@@ -72,26 +72,26 @@ pipeline {
 
                     echo "Files changed:\n${changedFiles}"
 
-                    // Tìm service nào có file thay đổi
+                    // Find which services have changed files
                     def changedServices = allServices.findAll { service ->
                         changedFiles.contains("${service}/")
                     }
 
-                    // Nếu không detect được gì (ví dụ: commit đầu tiên) → build tất cả
+                    // If nothing detected (e.g. first commit) → build all services
                     if (changedServices.isEmpty()) {
-                        echo "Không detect được service thay đổi → build tất cả services"
+                        echo "No changed services detected → building all services"
                         changedServices = allServices
                     }
 
-                    echo "Services cần build: ${changedServices}"
+                    echo "Services to build: ${changedServices}"
                     env.SERVICES_TO_BUILD = changedServices.join(',')
                 }
             }
         }
 
         // ----------------------------------------------------------------------
-        // Stage 3: Build + Test bằng Maven
-        // Chạy unit test và integration test trước khi build Docker image
+        // Stage 3: Build & Test with Maven
+        // Run unit tests and integration tests before building Docker image
         // ----------------------------------------------------------------------
         stage('Build & Test (Maven)') {
             steps {
@@ -113,7 +113,7 @@ pipeline {
 
         // ----------------------------------------------------------------------
         // Stage 4: Build Docker Image
-        // Tag image với commit SHA (Requirement 3) + "latest" nếu trên main
+        // Tag image with commit SHA (Requirement 3) + "latest" if on main branch
         // ----------------------------------------------------------------------
         stage('Build Docker Image') {
             steps {
@@ -123,9 +123,9 @@ pipeline {
                         def imageName = "${env.DOCKER_HUB_USER}/${service}"
                         echo "=== Docker build: ${imageName}:${env.IMAGE_TAG} ==="
 
-                        // Build với 2 tag:
-                        //   1. commit SHA (abc1234)  → nhận diện chính xác version
-                        //   2. IMAGE_TAG (latest hoặc SHA) → tag chính
+                        // Build with 2 tags:
+                        //   1. commit SHA (abc1234) → pinpoints exact version
+                        //   2. IMAGE_TAG (latest or SHA) → primary tag
                         sh """
                             docker build \
                                 -t ${imageName}:${env.COMMIT_SHA} \
@@ -138,9 +138,9 @@ pipeline {
         }
 
         // ----------------------------------------------------------------------
-        // Stage 5: Push lên Docker Hub
+        // Stage 5: Push to Docker Hub
         // ----------------------------------------------------------------------
-        stage('Push lên Docker Hub') {
+        stage('Push to Docker Hub') {
             steps {
                 script {
                     def services = env.SERVICES_TO_BUILD.split(',')
@@ -153,7 +153,7 @@ pipeline {
 
                         services.each { service ->
                             def imageName = "${env.DOCKER_HUB_USER}/${service}"
-                            echo "=== Push: ${imageName} ==="
+                            echo "=== Pushing: ${imageName} ==="
                             sh "docker push ${imageName}:${env.COMMIT_SHA}"
                             sh "docker push ${imageName}:${env.IMAGE_TAG}"
                         }
@@ -163,9 +163,9 @@ pipeline {
         }
 
         // ----------------------------------------------------------------------
-        // Stage 6: Dọn dẹp image trên Jenkins agent để tránh đầy ổ cứng
+        // Stage 6: Cleanup images on Jenkins agent to prevent disk fill-up
         // ----------------------------------------------------------------------
-        stage('Dọn dẹp') {
+        stage('Cleanup') {
             steps {
                 script {
                     def services = env.SERVICES_TO_BUILD.split(',')
@@ -182,7 +182,7 @@ pipeline {
         success {
             echo """
 ====================================================
-✅ CI PIPELINE THÀNH CÔNG
+CI PIPELINE SUCCEEDED
    Branch    : ${env.BRANCH_NAME}
    Commit    : ${env.COMMIT_SHA}
    Image Tag : ${env.IMAGE_TAG}
@@ -194,10 +194,10 @@ pipeline {
         failure {
             echo """
 ====================================================
-❌ CI PIPELINE THẤT BẠI
+CI PIPELINE FAILED
    Branch : ${env.BRANCH_NAME}
    Commit : ${env.COMMIT_SHA}
-   Kiểm tra Console Output để biết nguyên nhân
+   Check Console Output for details
 ====================================================
             """
         }
