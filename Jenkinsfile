@@ -1,75 +1,205 @@
 pipeline {
     agent any
 
-    parameters {
-        // Tham số chọn lựa service linh hoạt (mặc định chọn product theo yêu cầu)
-        choice(
-            name: 'SERVICE_NAME', 
-            choices: ['product', 'cart', 'order', 'customer', 'inventory', 'tax', 'media', 'search', 'storefront-bff', 'backoffice-bff'], 
-            description: 'Chọn service core cần build Docker Image'
-        )
-        string(name: 'IMAGE_TAG', defaultValue: 'latest', description: 'Docker Image Tag')
+    // ==========================================================================
+    // Tự động trigger khi có git push lên bất kỳ branch nào (Requirement 3)
+    // Yêu cầu: cài plugin "GitHub Integration" hoặc "Generic Webhook Trigger"
+    //          và cấu hình Webhook trên GitHub/GitLab trỏ về Jenkins
+    // ==========================================================================
+    triggers {
+        githubPush()
     }
 
     environment {
-        // THAY ĐỔI: Nhập đúng Username Docker Hub của bạn vào đây
-        DOCKER_HUB_USER = 'thaithienphu' 
-        // ID credentials đã tạo ở Bước 2
-        DOCKER_HUB_CREDS = 'docker-hub-credentials' 
-        IMAGE_NAME = "${env.DOCKER_HUB_USER}/${params.SERVICE_NAME}"
+        DOCKER_HUB_USER  = 'thaithienphu'
+        DOCKER_HUB_CREDS = 'docker-hub-credentials'
+
+        // Lấy 7 ký tự đầu của commit SHA làm image tag (ví dụ: abc1234)
+        // Nếu là nhánh main thì dùng "latest", ngược lại dùng commit SHA
+        COMMIT_SHA = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
+        IMAGE_TAG  = "${env.BRANCH_NAME == 'main' ? 'latest' : env.COMMIT_SHA}"
     }
 
     stages {
-        stage('Khởi tạo thông tin') {
+
+        // ----------------------------------------------------------------------
+        // Stage 1: In thông tin để dễ debug trên Jenkins console
+        // ----------------------------------------------------------------------
+        stage('Thông tin Pipeline') {
             steps {
-                echo "=== BẮT ĐẦU PIPELINE CHO SERVICE: ${params.SERVICE_NAME} ==="
-                echo "Tag đích: ${params.IMAGE_TAG}"
+                echo "======================================================"
+                echo " Branch    : ${env.BRANCH_NAME}"
+                echo " Commit SHA: ${env.COMMIT_SHA}"
+                echo " Image Tag : ${env.IMAGE_TAG}"
+                echo "======================================================"
+                sh 'git log -1 --oneline'
             }
         }
 
+        // ----------------------------------------------------------------------
+        // Stage 2: Detect service thay đổi dựa trên git diff
+        // Chỉ build service nào có file thay đổi trong commit này
+        // ----------------------------------------------------------------------
+        stage('Detect Changed Services') {
+            steps {
+                script {
+                    def allServices = [
+                        // Backend services
+                        'product',        // Sản phẩm — trung tâm của shop
+                        'cart',           // Giỏ hàng
+                        'order',          // Đơn hàng — test retry policy
+                        'customer',       // Thông tin khách hàng
+                        'inventory',      // Kho hàng
+                        'tax',            // Thuế — demo VirtualService retry
+                        'media',          // Upload hình ảnh
+                        'search',         // Tìm kiếm — demo AuthorizationPolicy
+                        // BFF services
+                        'storefront-bff', // BFF cho giao diện người dùng
+                        'backoffice-bff', // BFF cho quản trị
+                        // UI services (folder name ≠ service name)
+                        'storefront',     // → storefront-ui (giao diện cửa hàng)
+                        'backoffice',     // → backoffice-ui (giao diện quản trị)
+                        // Data seeding — chỉ chạy 1 lần sau khi deploy
+                        'sampledata'
+                        // ❌ swagger-ui → dùng public image swaggerapi/swagger-ui, không cần build
+                    ]
+
+                    // Lấy danh sách file thay đổi so với commit trước
+                    def changedFiles = sh(
+                        script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "Files changed:\n${changedFiles}"
+
+                    // Tìm service nào có file thay đổi
+                    def changedServices = allServices.findAll { service ->
+                        changedFiles.contains("${service}/")
+                    }
+
+                    // Nếu không detect được gì (ví dụ: commit đầu tiên) → build tất cả
+                    if (changedServices.isEmpty()) {
+                        echo "Không detect được service thay đổi → build tất cả services"
+                        changedServices = allServices
+                    }
+
+                    echo "Services cần build: ${changedServices}"
+                    env.SERVICES_TO_BUILD = changedServices.join(',')
+                }
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // Stage 3: Build + Test bằng Maven
+        // Chạy unit test và integration test trước khi build Docker image
+        // ----------------------------------------------------------------------
+        stage('Build & Test (Maven)') {
+            steps {
+                script {
+                    def services = env.SERVICES_TO_BUILD.split(',')
+                    services.each { service ->
+                        echo "=== Maven build & test: ${service} ==="
+                        sh """
+                            mvn clean install \
+                                -pl ${service} -am \
+                                -DskipTests=false \
+                                --no-transfer-progress \
+                                --batch-mode
+                        """
+                    }
+                }
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // Stage 4: Build Docker Image
+        // Tag image với commit SHA (Requirement 3) + "latest" nếu trên main
+        // ----------------------------------------------------------------------
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Di chuyển vào đúng thư mục của service được chọn (ví dụ: services/product)
-                    // Lưu ý điều chỉnh đường dẫn "services/..." cho đúng với cấu trúc repo YAS của bạn
-                    dir("services/${params.SERVICE_NAME}") {
-                        echo "Đang build image cho ${params.SERVICE_NAME}..."
-                        sh "docker build -t ${env.IMAGE_NAME}:${params.IMAGE_TAG} -t ${env.IMAGE_NAME}:${BUILD_NUMBER} ."
+                    def services = env.SERVICES_TO_BUILD.split(',')
+                    services.each { service ->
+                        def imageName = "${env.DOCKER_HUB_USER}/${service}"
+                        echo "=== Docker build: ${imageName}:${env.IMAGE_TAG} ==="
+
+                        // Build với 2 tag:
+                        //   1. commit SHA (abc1234)  → nhận diện chính xác version
+                        //   2. IMAGE_TAG (latest hoặc SHA) → tag chính
+                        sh """
+                            docker build \
+                                -t ${imageName}:${env.COMMIT_SHA} \
+                                -t ${imageName}:${env.IMAGE_TAG} \
+                                ./${service}
+                        """
                     }
                 }
             }
         }
 
-        stage('Push Image lên Docker Hub') {
+        // ----------------------------------------------------------------------
+        // Stage 5: Push lên Docker Hub
+        // ----------------------------------------------------------------------
+        stage('Push lên Docker Hub') {
             steps {
                 script {
-                    // Gọi credential bảo mật từ Jenkins
-                    withCredentials([usernamePassword(credentialsId: env.DOCKER_HUB_CREDS, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        echo "Đang đăng nhập Docker Hub..."
+                    def services = env.SERVICES_TO_BUILD.split(',')
+                    withCredentials([usernamePassword(
+                        credentialsId: env.DOCKER_HUB_CREDS,
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
                         sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                        
-                        echo "Đang tiến hành Push Images..."
-                        sh "docker push ${env.IMAGE_NAME}:${params.IMAGE_TAG}"
-                        sh "docker push ${env.IMAGE_NAME}:${BUILD_NUMBER}"
+
+                        services.each { service ->
+                            def imageName = "${env.DOCKER_HUB_USER}/${service}"
+                            echo "=== Push: ${imageName} ==="
+                            sh "docker push ${imageName}:${env.COMMIT_SHA}"
+                            sh "docker push ${imageName}:${env.IMAGE_TAG}"
+                        }
                     }
                 }
             }
         }
 
-        stage('Dọn dẹp môi trường local') {
+        // ----------------------------------------------------------------------
+        // Stage 6: Dọn dẹp image trên Jenkins agent để tránh đầy ổ cứng
+        // ----------------------------------------------------------------------
+        stage('Dọn dẹp') {
             steps {
-                echo "Xóa các image trung gian tại máy Agent để tránh tràn ổ cứng..."
-                sh "docker rmi ${env.IMAGE_NAME}:${params.IMAGE_TAG} ${env.IMAGE_NAME}:${BUILD_NUMBER} || true"
+                script {
+                    def services = env.SERVICES_TO_BUILD.split(',')
+                    services.each { service ->
+                        def imageName = "${env.DOCKER_HUB_USER}/${service}"
+                        sh "docker rmi ${imageName}:${env.COMMIT_SHA} ${imageName}:${env.IMAGE_TAG} || true"
+                    }
+                }
             }
         }
     }
 
     post {
         success {
-            echo "Hoàn thành! Service [${params.SERVICE_NAME}] đã được đẩy lên Docker Hub thành công."
+            echo """
+====================================================
+✅ CI PIPELINE THÀNH CÔNG
+   Branch    : ${env.BRANCH_NAME}
+   Commit    : ${env.COMMIT_SHA}
+   Image Tag : ${env.IMAGE_TAG}
+   Services  : ${env.SERVICES_TO_BUILD}
+   Docker Hub: https://hub.docker.com/u/${env.DOCKER_HUB_USER}
+====================================================
+            """
         }
         failure {
-            echo "Gặp lỗi trong quá trình thực thi. Vui lòng kiểm tra log ở Console Output."
+            echo """
+====================================================
+❌ CI PIPELINE THẤT BẠI
+   Branch : ${env.BRANCH_NAME}
+   Commit : ${env.COMMIT_SHA}
+   Kiểm tra Console Output để biết nguyên nhân
+====================================================
+            """
         }
     }
 }
