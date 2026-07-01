@@ -12,7 +12,7 @@ pipeline {
 
     environment {
         DOCKER_HUB_USER  = 'thaithienphu'
-        DOCKER_HUB_CREDS = 'docker-hub-credentials'
+        DOCKER_HUB_CREDS = 'dckr_pat_yrpLV3CISmrItL2w1HrCrb2IofY'
 
         // Take first 7 characters of commit SHA as image tag (e.g. abc1234)
         // If on main branch → use "latest", otherwise use commit SHA
