@@ -163,7 +163,48 @@ pipeline {
         }
 
         // ----------------------------------------------------------------------
-        // Stage 6: Cleanup images on Jenkins agent to prevent disk fill-up
+        // Stage 6: Update GitOps repo (values.yaml) and push
+        // Triggers ArgoCD sync automatically
+        // ----------------------------------------------------------------------
+        stage('Update GitOps Repo') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    def services = env.SERVICES_TO_BUILD.split(',')
+
+                    def serviceToChart = [
+                        'backoffice': 'backoffice-ui',
+                        'storefront': 'storefront-ui',
+                    ]
+
+                    sh """
+                        rm -rf yas-gitops
+                        git clone https://github.com/tthphat/yas-gitops.git
+                        cd yas-gitops
+                    """
+
+                    services.each { service ->
+                        def chartName = serviceToChart.get(service, service)
+                        def valuesPath = "k8s/charts/${chartName}/values.yaml"
+                        echo "=== Updating ${valuesPath} → tag: ${env.COMMIT_SHA} ==="
+                        sh "sed -i 's/^    tag:.*/    tag: ${env.COMMIT_SHA}/' yas-gitops/${valuesPath}"
+                    }
+
+                    sh """
+                        cd yas-gitops
+                        git add .
+                        git -c user.name='Jenkins CI' -c user.email='ci@jenkins' commit -m "Update image tags to ${env.COMMIT_SHA}"
+                        git push origin main
+                        cd .. && rm -rf yas-gitops
+                    """
+                }
+            }
+        }
+
+        // ----------------------------------------------------------------------
+        // Stage 7: Cleanup images on Jenkins agent to prevent disk fill-up
         // ----------------------------------------------------------------------
         stage('Cleanup') {
             steps {
