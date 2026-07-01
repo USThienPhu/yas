@@ -43,8 +43,10 @@ pipeline {
         stage('Detect Changed Services') {
             steps {
                 script {
-                    def allServices = [
-                        // Backend services
+                    // ----------------------------------------------------------
+                    // Maven (Java/Spring Boot) services — built with mvn
+                    // ----------------------------------------------------------
+                    def mavenServices = [
                         'product',        // Product catalog — core of the shop
                         'cart',           // Shopping cart
                         'order',          // Order management — test retry policy
@@ -53,16 +55,21 @@ pipeline {
                         'tax',            // Tax — demo VirtualService retry
                         'media',          // Product image upload
                         'search',         // Search — demo AuthorizationPolicy
-                        // BFF services
                         'storefront-bff', // BFF for storefront UI
                         'backoffice-bff', // BFF for backoffice UI
-                        // UI services (folder name differs from service name)
-                        'storefront',     // → storefront-ui (customer-facing shop)
-                        'backoffice',     // → backoffice-ui (admin panel)
-                        // Data seeding — run once after initial deploy
-                        'sampledata'
+                        'sampledata'      // Data seeding — run once after initial deploy
                         // swagger-ui → uses public image swaggerapi/swagger-ui, no build needed
                     ]
+
+                    // ----------------------------------------------------------
+                    // Node.js (Next.js) services — built with npm
+                    // ----------------------------------------------------------
+                    def nodeServices = [
+                        'storefront',     // → storefront-ui (customer-facing shop)
+                        'backoffice'      // → backoffice-ui (admin panel)
+                    ]
+
+                    def allServices = mavenServices + nodeServices
 
                     // Get list of files changed compared to previous commit
                     def changedFiles = sh(
@@ -85,27 +92,61 @@ pipeline {
 
                     echo "Services to build: ${changedServices}"
                     env.SERVICES_TO_BUILD = changedServices.join(',')
+
+                    // Separate changed services by build tool for downstream stages
+                    env.MAVEN_SERVICES = changedServices.findAll { it in mavenServices }.join(',')
+                    env.NODE_SERVICES  = changedServices.findAll { it in nodeServices  }.join(',')
+
+                    echo "Maven services: ${env.MAVEN_SERVICES}"
+                    echo "Node services:  ${env.NODE_SERVICES}"
                 }
             }
         }
 
         // ----------------------------------------------------------------------
-        // Stage 3: Build & Test with Maven
-        // Run unit tests and integration tests before building Docker image
+        // Stage 3: Build & Test
+        // Run Maven build for Java services and npm build for Node.js services
         // ----------------------------------------------------------------------
-        stage('Build & Test (Maven)') {
-            steps {
-                script {
-                    def services = env.SERVICES_TO_BUILD.split(',')
-                    services.each { service ->
-                        echo "=== Maven build & test: ${service} ==="
-                        sh """
-                            mvn clean install \
-                                -pl ${service} -am \
-                                -DskipTests=false \
-                                --no-transfer-progress \
-                                --batch-mode
-                        """
+        stage('Build & Test') {
+            parallel {
+                // ----------------------------------------------------------
+                // 3a: Maven (Java) services
+                // ----------------------------------------------------------
+                stage('Build & Test (Maven)') {
+                    when { expression { env.MAVEN_SERVICES?.trim() } }
+                    steps {
+                        script {
+                            def services = env.MAVEN_SERVICES.split(',')
+                            services.each { service ->
+                                echo "=== Maven build & test: ${service} ==="
+                                sh """
+                                    mvn clean install \
+                                        -pl ${service} -am \
+                                        -DskipTests=false \
+                                        --no-transfer-progress \
+                                        --batch-mode
+                                """
+                            }
+                        }
+                    }
+                }
+
+                // ----------------------------------------------------------
+                // 3b: Node.js (Next.js) services
+                // ----------------------------------------------------------
+                stage('Build & Test (Node.js)') {
+                    when { expression { env.NODE_SERVICES?.trim() } }
+                    steps {
+                        script {
+                            def services = env.NODE_SERVICES.split(',')
+                            services.each { service ->
+                                echo "=== npm build: ${service} ==="
+                                dir(service) {
+                                    sh 'npm ci'
+                                    sh 'npm run build'
+                                }
+                            }
+                        }
                     }
                 }
             }
