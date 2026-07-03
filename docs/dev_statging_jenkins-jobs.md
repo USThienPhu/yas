@@ -1,55 +1,84 @@
-# Jenkins Jobs & Flow
+# Jenkins Pipeline CI/CD
 
-## Tổng quan kiến trúc
+## Kiến trúc (1 pipeline duy nhất)
 
 ```
 GitHub (yas repo)
 │
-├── push (any branch) ──► CI (auto)
-│                            │
-│                            ├── branch ≠ main: build image tag = commit-id → push Docker Hub → dừng
-│                            └── branch = main: build image tag = commit-id → push Docker Hub
-│                                                → update GitOps values.yaml
-│                                                → ArgoCD dev auto-sync
+├── git push (any branch) ──► Jenkins Pipeline (Jenkinsfile)
+│                                │
+│                                ├── feature branch:
+│                                │     build image tag = commit-id → push Docker Hub → dừng
+│                                │
+│                                ├── main branch:
+│                                │     build image tag = commit-id + latest → push Docker Hub
+│                                │     → update GitOps values.yaml
+│                                │     → ArgoCD dev auto-sync
+│                                │
+│                                └── tag v* (e.g. git tag v1.2.3):
+│                                      build image tag = v1.2.3 → push Docker Hub
+│                                      → update GitOps values.staging.yaml
+│                                      → ArgoCD staging auto-sync
 │
-├── manual params ──► developer_build (manual)
-│                        │
-│                        ├── build image tag = commit-id cho service được chọn
-│                        ├── dùng image main cho service còn lại
-│                        └── deploy NodePort bằng kubectl → dev truy cập test
-│
-└── tag v* ──► staging-release (auto/manual)
-                 │
-                 ├── build image tag = v*
-                 ├── push Docker Hub
-                 ├── update GitOps values.staging.yaml
-                 └── ArgoCD staging auto-sync
+└── manual params ──► developer_build (job riêng, không gộp pipeline)
 ```
 
 ---
 
-## Job 1: CI (auto)
+## Pipeline: CI + staging-release (1 Jenkinsfile)
 
-**Trigger:** Push commit lên GitHub (bất kỳ branch nào)
+**File:** `Jenkinsfile` (source repo, thư mục gốc)
 
-**Luồng:**
+**Trigger:** GitHub push event (branch hoặc tag)
 
-1. Detect changed services (`git diff --name-only`)
-2. Maven build & test từng service thay đổi
-3. Docker build với tag = 7 ký tự commit-id
-4. Push image lên Docker Hub
-5. Nếu branch = **main**:
-   - Clone yas-gitops repo
-   - Sửa `tag:` trong `values.yaml` (dev) của từng service
-   - Commit & push lên yas-gitops
-6. ArgoCD dev phát hiện thay đổi → auto-sync vào namespace **dev**
-7. Cleanup image khỏi Jenkins agent
+**Credential cần có trong Jenkins:**
 
-**Nếu branch ≠ main:** chỉ build + push, không update GitOps.
+| ID | Loại | Mục đích |
+|----|------|----------|
+| `dockerhub-credentials` | Username with password | Docker Hub login |
+| `gitops-credentials` | Username with password (GitHub token) | Push yas-gitops repo |
+
+### Flow chi tiết
+
+```
+1. Pipeline Info
+    - In branch, commit SHA, image tag
+    ↓
+2. Detect Changed Services
+    - git diff --name-only → tìm service thay đổi
+    ↓
+3. Build & Test (parallel)
+    ├── Maven: mvn clean install -pl <service> -am -DskipTests=false
+    └── Node.js: npm ci && npm run build
+    ↓
+4. Build Docker Image
+    ├── feature branch → tag: commit-id
+    ├── main           → tag: commit-id + latest
+    └── tag v*         → tag: v1.2.3
+    ↓
+5. Push to Docker Hub
+    ↓
+6. Update GitOps Repo  ← chỉ chạy khi branch=main hoặc tag=v*
+    ├── main   → sửa values.yaml (dev)
+    └── tag v* → sửa values.staging.yaml (staging)
+    ↓
+7. Cleanup
+    - Xoá image khỏi Jenkins agent
+```
+
+### Tag convention
+
+| Trigger | Docker Hub tags | GitOps update | Deploy |
+|---------|----------------|---------------|--------|
+| Push feature | `thaithienphu/product:abc1234` | — | không deploy |
+| Push main | `thaithienphu/product:abc1234` + `:latest` | `values.yaml` → `tag: abc1234` | ArgoCD → **dev** |
+| Tag `v1.2.3` | `thaithienphu/product:v1.2.3` | `values.staging.yaml` → `tag: v1.2.3` | ArgoCD → **staging** |
+
+**`latest` tag** trên Docker Hub dùng cho `developer_build` job (khi dev muốn deploy NodePort để test, service không build sẽ dùng image `:latest` sẵn có).
 
 ---
 
-## Job 2: developer_build (manual)
+## Job developer_build (manual)
 
 **Trigger:** Developer mở Jenkins job, nhập tham số
 
@@ -57,49 +86,17 @@ GitHub (yas repo)
 
 | Parameter | Ví dụ | Mô tả |
 |-----------|-------|-------|
-| `tax_branch` | `dev_tax_service` | Branch muốn test cho service tax |
-| `cart_branch` | (để trống) | Branch muốn test cho service cart |
-| `product_branch` | (để trống) | Branch muốn test cho service product |
-| ... | ... | Tương tự cho các service còn lại |
+| `product_branch` | `dev_product_feature` | Branch muốn test cho service product |
+| `cart_branch` | (để trống) | Nếu trống → dùng image `:latest` có sẵn |
+| (tương tự cho các service còn lại) |
 
 **Luồng:**
 
 1. Với mỗi service:
-   - Nếu có branch: checkout branch đó → build image tag = commit-id
-   - Nếu không có branch: dùng image tag = `main` có sẵn trên Docker Hub
-2. Tạo deployment + service NodePort trong K8S (namespace riêng hoặc namespace `dev`)
-3. In ra URL: `http://<worker-node-ip>:<NodePort>`
-4. Developer thêm vào `hosts` file, truy cập test
-
----
-
-## Job 3: staging-release (auto/manual)
-
-**Trigger:** Git tag dạng `v*` (vd: `git tag v1.2.3 && git push origin v1.2.3`)
-
-**Luồng:**
-
-1. Checkout code tại tag (vd: `v1.2.3`)
-2. Detect changed services (so với tag trước)
-3. Maven build & test
-4. Docker build với tag = tên tag (vd: `v1.2.3`)
-5. Push image lên Docker Hub
-6. Clone yas-gitops
-7. Sửa `tag:` trong `values.staging.yaml` của từng service
-8. Commit & push lên yas-gitops
-9. ArgoCD staging phát hiện thay đổi → auto-sync vào namespace **staging**
-10. Cleanup
-
----
-
-## So sánh 3 job
-
-| Job | Trigger | Build tag | Deploy tới | Cách deploy |
-|-----|---------|-----------|------------|-------------|
-| CI (main) | Push main | `commit-id` | namespace **dev** | ArgoCD (GitOps) |
-| CI (nhánh khác) | Push feature | `commit-id` | không deploy | chỉ push image |
-| developer_build | Manual params | `commit-id` / `main` | NodePort | kubectl trực tiếp |
-| staging-release | Tag `v*` | `v1.2.3` | namespace **staging** | ArgoCD (GitOps) |
+   - Nếu có branch: checkout branch → build image tag = commit-id
+   - Nếu không có branch: dùng image `:latest` từ Docker Hub
+2. Tạo deployment + NodePort service trong K8S
+3. In URL `http://<node-ip>:<NodePort>` → dev test
 
 ---
 
@@ -111,20 +108,14 @@ k8s/
 │   ├── values.yaml              # dùng cho DEV (tag được CI update)
 │   └── values.staging.yaml      # dùng cho STAGING (tag được staging-release update)
 ├── argocd-apps/
-│   ├── cart-dev.yaml            # namespace: dev,   valueFiles: [values.yaml]
-│   ├── cart-staging.yaml        # namespace: staging, valueFiles: [values.staging.yaml]
-│   ├── product-dev.yaml
-│   ├── product-staging.yaml
-│   └── ...
-└── root-app/
-    └── root.yaml                # App of Apps, quét toàn bộ argocd-apps/
+│   ├── dev/
+│   │   ├── product.yaml         # namespace: dev,   valueFiles: [values.yaml]
+│   │   ├── cart.yaml
+│   │   └── ...
+│   ├── staging/
+│   │   ├── product.yaml         # namespace: staging, valueFiles: [values.staging.yaml]
+│   │   ├── cart.yaml
+│   │   └── ...
+│   └── root-app/
+│       └── root.yaml            # App of Apps, quét toàn bộ argocd-apps/
 ```
-
----
-
-## Yêu cầu K8S
-
-- 1 Master node + 1 Worker node (hoặc Minikube)
-- Service type NodePort cho developer_build
-- Namespace: `dev`, `staging` (cho ArgoCD)
-- Observability: không cần Grafana/Prometheus
