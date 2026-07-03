@@ -256,9 +256,10 @@ pipeline {
 
                     def valuesFile = env.IS_STAGING == 'true' ? 'values.staging.yaml' : 'values.yaml'
                     def deployEnv = env.IS_STAGING == 'true' ? 'staging' : 'dev'
-                    // For CI (main): use commit SHA as tag (e.g. abc1234)
+                    // For CI (main): use latest tag according to Requirement 1
                     // For staging-release: use version tag (e.g. v1.2.3)
-                    def updateTag = env.IS_STAGING == 'true' ? env.IMAGE_TAG : env.COMMIT_SHA
+                    // For feature branches: use commit SHA
+                    def updateTag = (env.BRANCH_NAME == 'main' || env.TAG_NAME != null) ? env.IMAGE_TAG : env.COMMIT_SHA
                     def commitMsg = env.IS_STAGING == 'true'
                         ? "Release ${env.TAG_NAME}: update image tags to ${env.COMMIT_SHA}"
                         : "Update image tags to ${env.COMMIT_SHA}"
