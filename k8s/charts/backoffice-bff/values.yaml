@@ -19,7 +19,7 @@ backend:
     - name: SPRING_PROFILES_ACTIVE
       value: k8s
     - name: UI_HOST
-      value: http://backoffice-ui.yas.svc.cluster.local:3000
+      value: http://backoffice-ui.dev.svc.cluster.local:3000
   extraEnvFroms:
     - secretRef:
         name: yas-keycloak-credentials-secret
