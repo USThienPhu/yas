@@ -263,32 +263,28 @@ pipeline {
                         ? "Release ${env.TAG_NAME}: update image tags to ${env.COMMIT_SHA}"
                         : "Update image tags to ${env.COMMIT_SHA}"
 
-                    withCredentials([gitUsernamePassword(
-                        credentialsId: env.GIT_OPS_CREDS
-                    )]) {
-                        sh """
-                            rm -rf yas-gitops
-                            git clone https://github.com/tthphat/yas-gitops.git
-                            cd yas-gitops
-                            git config user.name 'Jenkins CI'
-                            git config user.email 'ci@jenkins'
-                        """
+                    sh """
+                        rm -rf yas-gitops
+                        git clone git@github.com:tthphat/yas-gitops.git
+                        cd yas-gitops
+                        git config user.name 'Jenkins CI'
+                        git config user.email 'ci@jenkins'
+                    """
 
-                        services.each { service ->
-                            def chartName = serviceToChart.get(service, service)
-                            def valuesPath = "k8s/charts/${chartName}/${valuesFile}"
-                            echo "=== Updating ${valuesPath} → tag: ${updateTag} ==="
-                            sh "sed -i 's/^    tag:.*/    tag: ${updateTag}/' yas-gitops/${valuesPath}"
-                        }
-
-                        sh """
-                            cd yas-gitops
-                            git add .
-                            git commit -m "${commitMsg}"
-                            git push origin main
-                            cd .. && rm -rf yas-gitops
-                        """
+                    services.each { service ->
+                        def chartName = serviceToChart.get(service, service)
+                        def valuesPath = "k8s/charts/${chartName}/${valuesFile}"
+                        echo "=== Updating ${valuesPath} → tag: ${updateTag} ==="
+                        sh "sed -i 's/^    tag:.*/    tag: ${updateTag}/' yas-gitops/${valuesPath}"
                     }
+
+                    sh """
+                        cd yas-gitops
+                        git add .
+                        git commit -m "${commitMsg}"
+                        git push origin main
+                        cd .. && rm -rf yas-gitops
+                    """
 
                     echo "Updated ${deployEnv} GitOps → ArgoCD will auto-sync"
                 }
