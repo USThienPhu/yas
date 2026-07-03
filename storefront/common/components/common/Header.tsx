@@ -121,7 +121,7 @@ const Header = ({ children }: Props) => {
         <nav className="limiter-menu-desktop container">
           {/* <!-- Logo desktop --> */}
           <Link href="/" className="header-logo me-3">
-            <h3 className="text-black">Yas - Storefront CI/CD OK</h3>
+            <h3 className="text-black">Yas - Storefront CI/CD OK (MOdify)</h3>
           </Link>
 
           {/* <!-- Search --> */}
