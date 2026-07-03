@@ -319,7 +319,7 @@ pipeline {
 
     post {
         success {
-            def deployEnv = env.IS_STAGING == 'true' ? 'staging' : (env.BRANCH_NAME == 'main' ? 'dev' : 'none')
+            env.DEPLOY_ENV = env.IS_STAGING == 'true' ? 'staging' : (env.BRANCH_NAME == 'main' ? 'dev' : 'none')
             echo """
 ============================================================
 PIPELINE SUCCEEDED
@@ -327,7 +327,7 @@ PIPELINE SUCCEEDED
    Commit    : ${env.COMMIT_SHA}
    Image Tag : ${env.IMAGE_TAG}
    Services  : ${env.SERVICES_TO_BUILD}
-   Deploy to : ${deployEnv}
+   Deploy to : ${env.DEPLOY_ENV}
    Docker Hub: https://hub.docker.com/u/${env.DOCKER_HUB_USER}
 ============================================================
             """
