@@ -2,9 +2,9 @@ pipeline {
     agent any
 
     // ==========================================================================
-    // Auto-trigger on every git push to any branch (Requirement 3)
+    // Trigger on every git push (branch or tag) (Requirement 3)
     // Requires: "GitHub Integration" or "Generic Webhook Trigger" plugin
-    //           and a Webhook configured on GitHub/GitLab pointing to Jenkins
+    //           and a Webhook configured on GitHub pointing to Jenkins
     // ==========================================================================
     triggers {
         githubPush()
@@ -13,11 +13,18 @@ pipeline {
     environment {
         DOCKER_HUB_USER  = 'thaithienphu'
         DOCKER_HUB_CREDS = 'dockerhub-credentials'
+        GIT_OPS_CREDS    = 'gitops-credentials'
+        YAS_GITOPS_REPO  = 'https://github.com/tthphat/yas-gitops.git'
 
-        // Take first 7 characters of commit SHA as image tag (e.g. abc1234)
-        // If on main branch → use "latest", otherwise use commit SHA
         COMMIT_SHA = "${env.GIT_COMMIT ? env.GIT_COMMIT.take(7) : 'latest'}"
-        IMAGE_TAG  = "${env.BRANCH_NAME == 'main' ? 'latest' : env.COMMIT_SHA}"
+
+        // For tag push (v*): IMAGE_TAG = tag name, e.g. v1.2.3
+        // For main branch:     IMAGE_TAG = latest
+        // Otherwise:           IMAGE_TAG = commit SHA
+        IMAGE_TAG = "${env.TAG_NAME ?: (env.BRANCH_NAME == 'main' ? 'latest' : env.COMMIT_SHA)}"
+
+        // Detect if this is a staging release (tag v*)
+        IS_STAGING = "${env.TAG_NAME != null && env.TAG_NAME =~ /v.*/ ? 'true' : 'false'}"
     }
 
     stages {
@@ -39,6 +46,8 @@ pipeline {
         // ----------------------------------------------------------------------
         // Stage 2: Detect which services changed based on git diff
         // Only build services that have file changes in this commit
+        // For tag triggers: compare with previous tag or build all
+        // For branch push:  compare HEAD~1 with HEAD
         // ----------------------------------------------------------------------
         stage('Detect Changed Services') {
             steps {
@@ -71,11 +80,27 @@ pipeline {
 
                     def allServices = mavenServices + nodeServices
 
-                    // Get list of files changed compared to previous commit
-                    def changedFiles = sh(
-                        script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD',
-                        returnStdout: true
-                    ).trim()
+                    // For tag push: compare with previous tag, else build all
+                    // For branch push: compare HEAD~1 with HEAD
+                    def changedFiles = ''
+                    if (env.TAG_NAME) {
+                        def prevTag = sh(
+                            script: 'git tag --sort=-creatordate | head -2 | tail -1 || true',
+                            returnStdout: true
+                        ).trim()
+                        if (prevTag) {
+                            changedFiles = sh(
+                                script: "git diff --name-only ${prevTag}..${env.TAG_NAME}",
+                                returnStdout: true
+                            ).trim()
+                        }
+                    }
+                    if (!changedFiles) {
+                        changedFiles = sh(
+                            script: 'git diff --name-only HEAD~1 HEAD 2>/dev/null || git diff --name-only HEAD',
+                            returnStdout: true
+                        ).trim()
+                    }
 
                     echo "Files changed:\n${changedFiles}"
 
@@ -154,25 +179,24 @@ pipeline {
 
         // ----------------------------------------------------------------------
         // Stage 4: Build Docker Image
-        // Tag image with commit SHA (Requirement 3) + "latest" if on main branch
+        // Tag convention:
+        //   - main branch:    abc1234 (GitOps) + latest (developer_build)
+        //   - tag v*:         v1.2.3 (GitOps) only
+        //   - feature branch: abc1234 only
         // ----------------------------------------------------------------------
         stage('Build Docker Image') {
             steps {
                 script {
                     def services = env.SERVICES_TO_BUILD.split(',')
+                    def extraTag = env.BRANCH_NAME == 'main' ? 'latest' : ''
+                    def tags = [env.IMAGE_TAG]
+                    if (extraTag) tags.add(extraTag)
+
                     services.each { service ->
                         def imageName = "${env.DOCKER_HUB_USER}/${service}"
-                        echo "=== Docker build: ${imageName}:${env.IMAGE_TAG} ==="
-
-                        // Build with 2 tags:
-                        //   1. commit SHA (abc1234) → pinpoints exact version
-                        //   2. IMAGE_TAG (latest or SHA) → primary tag
-                        sh """
-                            docker build \
-                                -t ${imageName}:${env.COMMIT_SHA} \
-                                -t ${imageName}:${env.IMAGE_TAG} \
-                                ./${service}
-                        """
+                        def tagArgs = tags.collect { "-t ${imageName}:${it}" }.join(' ')
+                        echo "=== Docker build: ${imageName}:${tags.join(', ')} ==="
+                        sh "docker build ${tagArgs} ./${service}"
                     }
                 }
             }
@@ -185,6 +209,10 @@ pipeline {
             steps {
                 script {
                     def services = env.SERVICES_TO_BUILD.split(',')
+                    def extraTag = env.BRANCH_NAME == 'main' ? 'latest' : ''
+                    def tags = [env.IMAGE_TAG]
+                    if (extraTag) tags.add(extraTag)
+
                     withCredentials([usernamePassword(
                         credentialsId: env.DOCKER_HUB_CREDS,
                         usernameVariable: 'DOCKER_USER',
@@ -194,9 +222,10 @@ pipeline {
 
                         services.each { service ->
                             def imageName = "${env.DOCKER_HUB_USER}/${service}"
-                            echo "=== Pushing: ${imageName} ==="
-                            sh "docker push ${imageName}:${env.COMMIT_SHA}"
-                            sh "docker push ${imageName}:${env.IMAGE_TAG}"
+                            tags.each { tag ->
+                                echo "=== Pushing: ${imageName}:${tag} ==="
+                                sh "docker push ${imageName}:${tag}"
+                            }
                         }
                     }
                 }
@@ -204,12 +233,17 @@ pipeline {
         }
 
         // ----------------------------------------------------------------------
-        // Stage 6: Update GitOps repo (values.yaml) and push
+        // Stage 6: Update GitOps repo and push
+        // - main branch → update values.yaml (dev)
+        // - tag v*     → update values.staging.yaml (staging)
         // Triggers ArgoCD sync automatically
         // ----------------------------------------------------------------------
         stage('Update GitOps Repo') {
             when {
-                branch 'main'
+                anyOf {
+                    branch 'main'
+                    expression { env.IS_STAGING == 'true' }
+                }
             }
             steps {
                 script {
@@ -220,26 +254,43 @@ pipeline {
                         'storefront': 'storefront-ui',
                     ]
 
-                    sh """
-                        rm -rf yas-gitops
-                        git clone https://github.com/tthphat/yas-gitops.git
-                        cd yas-gitops
-                    """
+                    def valuesFile = env.IS_STAGING == 'true' ? 'values.staging.yaml' : 'values.yaml'
+                    def deployEnv = env.IS_STAGING == 'true' ? 'staging' : 'dev'
+                    // For CI (main): use commit SHA as tag (e.g. abc1234)
+                    // For staging-release: use version tag (e.g. v1.2.3)
+                    def updateTag = env.IS_STAGING == 'true' ? env.IMAGE_TAG : env.COMMIT_SHA
+                    def commitMsg = env.IS_STAGING == 'true'
+                        ? "Release ${env.TAG_NAME}: update image tags to ${env.COMMIT_SHA}"
+                        : "Update image tags to ${env.COMMIT_SHA}"
 
-                    services.each { service ->
-                        def chartName = serviceToChart.get(service, service)
-                        def valuesPath = "k8s/charts/${chartName}/values.yaml"
-                        echo "=== Updating ${valuesPath} → tag: ${env.COMMIT_SHA} ==="
-                        sh "sed -i 's/^    tag:.*/    tag: ${env.COMMIT_SHA}/' yas-gitops/${valuesPath}"
+                    withCredentials([gitUsernamePassword(
+                        credentialsId: env.GIT_OPS_CREDS
+                    )]) {
+                        sh """
+                            rm -rf yas-gitops
+                            git clone https://github.com/tthphat/yas-gitops.git
+                            cd yas-gitops
+                            git config user.name 'Jenkins CI'
+                            git config user.email 'ci@jenkins'
+                        """
+
+                        services.each { service ->
+                            def chartName = serviceToChart.get(service, service)
+                            def valuesPath = "k8s/charts/${chartName}/${valuesFile}"
+                            echo "=== Updating ${valuesPath} → tag: ${updateTag} ==="
+                            sh "sed -i 's/^    tag:.*/    tag: ${updateTag}/' yas-gitops/${valuesPath}"
+                        }
+
+                        sh """
+                            cd yas-gitops
+                            git add .
+                            git commit -m "${commitMsg}"
+                            git push origin main
+                            cd .. && rm -rf yas-gitops
+                        """
                     }
 
-                    sh """
-                        cd yas-gitops
-                        git add .
-                        git -c user.name='Jenkins CI' -c user.email='ci@jenkins' commit -m "Update image tags to ${env.COMMIT_SHA}"
-                        git push origin main
-                        cd .. && rm -rf yas-gitops
-                    """
+                    echo "Updated ${deployEnv} GitOps → ArgoCD will auto-sync"
                 }
             }
         }
@@ -251,9 +302,15 @@ pipeline {
             steps {
                 script {
                     def services = env.SERVICES_TO_BUILD.split(',')
+                    def extraTag = env.BRANCH_NAME == 'main' ? 'latest' : ''
+                    def tags = [env.IMAGE_TAG]
+                    if (extraTag) tags.add(extraTag)
+
                     services.each { service ->
                         def imageName = "${env.DOCKER_HUB_USER}/${service}"
-                        sh "docker rmi ${imageName}:${env.COMMIT_SHA} ${imageName}:${env.IMAGE_TAG} || true"
+                        tags.each { tag ->
+                            sh "docker rmi ${imageName}:${tag} || true"
+                        }
                     }
                 }
             }
@@ -262,25 +319,27 @@ pipeline {
 
     post {
         success {
+            def deployEnv = env.IS_STAGING == 'true' ? 'staging' : (env.BRANCH_NAME == 'main' ? 'dev' : 'none')
             echo """
-====================================================
-CI PIPELINE SUCCEEDED
-   Branch    : ${env.BRANCH_NAME}
+============================================================
+PIPELINE SUCCEEDED
+   Type      : ${env.TAG_NAME ?: env.BRANCH_NAME ?: 'unknown'}
    Commit    : ${env.COMMIT_SHA}
    Image Tag : ${env.IMAGE_TAG}
    Services  : ${env.SERVICES_TO_BUILD}
+   Deploy to : ${deployEnv}
    Docker Hub: https://hub.docker.com/u/${env.DOCKER_HUB_USER}
-====================================================
+============================================================
             """
         }
         failure {
             echo """
-====================================================
-CI PIPELINE FAILED
-   Branch : ${env.BRANCH_NAME}
+============================================================
+PIPELINE FAILED
+   Type   : ${env.TAG_NAME ?: env.BRANCH_NAME ?: 'unknown'}
    Commit : ${env.COMMIT_SHA}
    Check Console Output for details
-====================================================
+============================================================
             """
         }
     }
