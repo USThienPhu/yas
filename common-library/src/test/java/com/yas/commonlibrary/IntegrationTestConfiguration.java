@@ -1,6 +1,7 @@
 package com.yas.commonlibrary;
 
 import dasniko.testcontainers.keycloak.KeycloakContainer;
+import java.time.Duration;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,7 @@ public class IntegrationTestConfiguration {
     @ServiceConnection
     public PostgreSQLContainer<?> postgresContainer() {
         return new PostgreSQLContainer<>("postgres:16")
+            .withStartupTimeout(Duration.ofMinutes(5))
             .withReuse(true);
     }
 
@@ -21,6 +23,7 @@ public class IntegrationTestConfiguration {
     public KeycloakContainer keycloakContainer() {
         return new KeycloakContainer()
             .withRealmImportFiles("/test-realm.json")
+            .withStartupTimeout(Duration.ofMinutes(5))
             .withReuse(true);
     }
 
