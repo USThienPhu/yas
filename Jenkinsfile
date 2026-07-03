@@ -319,7 +319,9 @@ pipeline {
 
     post {
         success {
-            env.DEPLOY_ENV = env.IS_STAGING == 'true' ? 'staging' : (env.BRANCH_NAME == 'main' ? 'dev' : 'none')
+            script {
+                env.DEPLOY_ENV = env.IS_STAGING == 'true' ? 'staging' : (env.BRANCH_NAME == 'main' ? 'dev' : 'none')
+            }
             echo """
 ============================================================
 PIPELINE SUCCEEDED
