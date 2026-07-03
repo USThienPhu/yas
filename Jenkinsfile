@@ -263,28 +263,32 @@ pipeline {
                         ? "Release ${env.TAG_NAME}: update image tags to ${env.COMMIT_SHA}"
                         : "Update image tags to ${env.COMMIT_SHA}"
 
-                    sh """
-                        rm -rf yas-gitops
-                        git clone git@github.com:tthphat/yas-gitops.git
-                        cd yas-gitops
-                        git config user.name 'Jenkins CI'
-                        git config user.email 'ci@jenkins'
-                    """
+                    sshagent(credentials: [env.GIT_OPS_CREDS]) {
+                        sh """
+                            mkdir -p ~/.ssh
+                            ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+                            rm -rf yas-gitops
+                            git clone git@github.com:tthphat/yas-gitops.git
+                            cd yas-gitops
+                            git config user.name 'Jenkins CI'
+                            git config user.email 'ci@jenkins'
+                        """
 
-                    services.each { service ->
-                        def chartName = serviceToChart.get(service, service)
-                        def valuesPath = "k8s/charts/${chartName}/${valuesFile}"
-                        echo "=== Updating ${valuesPath} → tag: ${updateTag} ==="
-                        sh "sed -i 's/^    tag:.*/    tag: ${updateTag}/' yas-gitops/${valuesPath}"
+                        services.each { service ->
+                            def chartName = serviceToChart.get(service, service)
+                            def valuesPath = "k8s/charts/${chartName}/${valuesFile}"
+                            echo "=== Updating ${valuesPath} → tag: ${updateTag} ==="
+                            sh "sed -i 's/^    tag:.*/    tag: ${updateTag}/' yas-gitops/${valuesPath}"
+                        }
+
+                        sh """
+                            cd yas-gitops
+                            git add .
+                            git commit -m "${commitMsg}"
+                            git push origin main
+                            cd .. && rm -rf yas-gitops
+                        """
                     }
-
-                    sh """
-                        cd yas-gitops
-                        git add .
-                        git commit -m "${commitMsg}"
-                        git push origin main
-                        cd .. && rm -rf yas-gitops
-                    """
 
                     echo "Updated ${deployEnv} GitOps → ArgoCD will auto-sync"
                 }
