@@ -43,6 +43,12 @@ pipeline {
         withCredentials([file(credentialsId: env.KUBECONFIG_CREDS, variable: 'KUBECONFIG')]) {
           script {
             def chartPath = "k8s/charts/${params.SERVICE_NAME}"
+            def isFrontend = params.SERVICE_NAME.endsWith('-ui')
+            def prefix = isFrontend ? 'ui' : 'backend'
+            def ingressHost = isFrontend 
+              ? (params.SERVICE_NAME == 'storefront-ui' ? 'storefront.test.yas.local.com' : 'backoffice.test.yas.local.com')
+              : 'api.test.yas.local.com'
+
             sh """
               echo "📦 Building dependencies for ${params.SERVICE_NAME}..."
               helm dependency build ${chartPath}
@@ -51,9 +57,9 @@ pipeline {
                 --namespace ${env.K8S_NAMESPACE} \\
                 --create-namespace \\
                 --reset-values \\
-                --set backend.image.repository=${env.DOCKER_HUB_USER}/${params.SERVICE_NAME} \\
-                --set backend.image.tag=${env.IMAGE_TAG} \\
-                --set backend.ingress.host=api.yas.local.com \\
+                --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${params.SERVICE_NAME} \\
+                --set ${prefix}.image.tag=${env.IMAGE_TAG} \\
+                --set ${prefix}.ingress.host=${ingressHost} \\
                 --wait --timeout 5m
             """
           }
@@ -81,14 +87,14 @@ pipeline {
 ║  Branch:   ${params.DEV_BRANCH}
 ╠══════════════════════════════════════════════════════════╣
 ║  Add to your /etc/hosts:
-║    ${workerIp}  storefront.yas.local.com
-║    ${workerIp}  backoffice.yas.local.com
-║    ${workerIp}  api.yas.local.com
+║    ${workerIp}  storefront.test.yas.local.com
+║    ${workerIp}  backoffice.test.yas.local.com
+║    ${workerIp}  api.test.yas.local.com
 ╠══════════════════════════════════════════════════════════╣
 ║  Access URLs:
-║    Storefront:  http://storefront.yas.local.com:30080
-║    Backoffice:  http://backoffice.yas.local.com:30081
-║    API:         http://api.yas.local.com:30082
+║    Storefront:  http://storefront.test.yas.local.com:30080
+║    Backoffice:  http://backoffice.test.yas.local.com:30081
+║    API:         http://api.test.yas.local.com:30082
 ╚══════════════════════════════════════════════════════════╝
             """
           }
