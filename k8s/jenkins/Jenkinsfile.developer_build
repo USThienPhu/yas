@@ -1,0 +1,105 @@
+pipeline {
+  agent any
+
+  parameters {
+    choice(
+      name: 'SERVICE_NAME',
+      choices: [
+        'product', 'cart', 'order', 'customer',
+        'inventory', 'tax', 'media', 'search',
+        'storefront-bff', 'backoffice-bff'
+      ],
+      description: '🔧 Select the service to deploy from your dev branch'
+    )
+    string(
+      name: 'DEV_BRANCH',
+      defaultValue: 'main',
+      description: '🌿 Dev branch name (e.g. dev_tax_service). Other services stay on main/latest.'
+    )
+  }
+
+  environment {
+    DOCKER_HUB_USER  = 'thaithienphu'
+    K8S_NAMESPACE    = 'yas'
+    KUBECONFIG_CREDS = 'kubeconfig-credentials'
+  }
+
+  stages {
+    stage('Resolve Image Tag') {
+      steps {
+        script {
+          // Use branch name as tag, or 'latest' for main
+          env.IMAGE_TAG = (params.DEV_BRANCH.trim() == 'main') \
+            ? 'latest' \
+            : params.DEV_BRANCH.trim().replace('/', '-')
+          echo "🏷️  Image tag resolved: ${env.IMAGE_TAG}"
+        }
+      }
+    }
+
+    stage('Deploy Service') {
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDS, variable: 'KUBECONFIG')]) {
+          script {
+            def chartPath = "k8s/charts/${params.SERVICE_NAME}"
+            sh """
+              echo "🚀 Deploying ${params.SERVICE_NAME}:${env.IMAGE_TAG} to namespace ${env.K8S_NAMESPACE}"
+              helm upgrade --install ${params.SERVICE_NAME} ${chartPath} \\
+                --namespace ${env.K8S_NAMESPACE} \\
+                --create-namespace \\
+                --reset-values \\
+                --set backend.image.repository=${env.DOCKER_HUB_USER}/${params.SERVICE_NAME} \\
+                --set backend.image.tag=${env.IMAGE_TAG} \\
+                --set backend.ingress.host=api.yas.local.com \\
+                --wait --timeout 5m
+            """
+          }
+        }
+      }
+    }
+
+    stage('Print Developer Access Info') {
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDS, variable: 'KUBECONFIG')]) {
+          script {
+            def workerIp = sh(
+              script: """kubectl get nodes \\
+                --selector='!node-role.kubernetes.io/control-plane' \\
+                -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}'""",
+              returnStdout: true
+            ).trim()
+
+            echo """
+╔══════════════════════════════════════════════════════════╗
+║            ✅ DEPLOYMENT COMPLETE                        ║
+╠══════════════════════════════════════════════════════════╣
+║  Service:  ${params.SERVICE_NAME}
+║  Tag:      ${env.IMAGE_TAG}
+║  Branch:   ${params.DEV_BRANCH}
+╠══════════════════════════════════════════════════════════╣
+║  Add to your /etc/hosts:
+║    ${workerIp}  storefront.yas.local.com
+║    ${workerIp}  backoffice.yas.local.com
+║    ${workerIp}  api.yas.local.com
+╠══════════════════════════════════════════════════════════╣
+║  Access URLs:
+║    Storefront:  http://storefront.yas.local.com:30080
+║    Backoffice:  http://backoffice.yas.local.com:30081
+║    API:         http://api.yas.local.com:30082
+╚══════════════════════════════════════════════════════════╝
+            """
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "✅ ${params.SERVICE_NAME} (${env.IMAGE_TAG}) deployed successfully to namespace ${env.K8S_NAMESPACE}"
+    }
+    failure {
+      echo "❌ Deployment failed for ${params.SERVICE_NAME}. Check Console Output above."
+    }
+  }
+}

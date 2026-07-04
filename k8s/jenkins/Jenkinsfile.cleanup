@@ -1,0 +1,67 @@
+pipeline {
+  agent any
+
+  parameters {
+    choice(
+      name: 'SERVICE_NAME',
+      choices: [
+        'product', 'cart', 'order', 'customer',
+        'inventory', 'tax', 'media', 'search',
+        'storefront-bff', 'backoffice-bff',
+        'ALL_YAS_SERVICES'
+      ],
+      description: '🗑️  Select service to remove (ALL_YAS_SERVICES = remove entire yas namespace)'
+    )
+  }
+
+  environment {
+    K8S_NAMESPACE    = 'yas'
+    KUBECONFIG_CREDS = 'kubeconfig-credentials'
+  }
+
+  stages {
+    stage('Confirm Cleanup') {
+      steps {
+        script {
+          echo "⚠️  About to remove: ${params.SERVICE_NAME} from namespace ${env.K8S_NAMESPACE}"
+        }
+      }
+    }
+
+    stage('Remove Deployment') {
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDS, variable: 'KUBECONFIG')]) {
+          script {
+            if (params.SERVICE_NAME == 'ALL_YAS_SERVICES') {
+              sh """
+                echo "🧨 Removing all YAS services (helm uninstall all releases in yas ns)..."
+                helm list -n ${env.K8S_NAMESPACE} -q | xargs -r -I{} helm uninstall {} -n ${env.K8S_NAMESPACE}
+                echo "✅ All Helm releases removed from ${env.K8S_NAMESPACE}"
+              """
+            } else {
+              sh """
+                echo "🗑️  Uninstalling ${params.SERVICE_NAME}..."
+                helm uninstall ${params.SERVICE_NAME} -n ${env.K8S_NAMESPACE} || true
+                echo "✅ ${params.SERVICE_NAME} removed from ${env.K8S_NAMESPACE}"
+              """
+            }
+          }
+        }
+      }
+    }
+
+    stage('Verify Removal') {
+      steps {
+        withCredentials([file(credentialsId: env.KUBECONFIG_CREDS, variable: 'KUBECONFIG')]) {
+          sh "helm list -n ${env.K8S_NAMESPACE}"
+          sh "kubectl get pods -n ${env.K8S_NAMESPACE}"
+        }
+      }
+    }
+  }
+
+  post {
+    success { echo "🗑️  Cleanup complete for: ${params.SERVICE_NAME}" }
+    failure { echo "❌ Cleanup failed. Check Console Output." }
+  }
+}
