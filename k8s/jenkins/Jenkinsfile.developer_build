@@ -44,6 +44,8 @@ pipeline {
           script {
             def chartPath = "k8s/charts/${params.SERVICE_NAME}"
             sh """
+              echo "📦 Building dependencies for ${params.SERVICE_NAME}..."
+              helm dependency build ${chartPath}
               echo "🚀 Deploying ${params.SERVICE_NAME}:${env.IMAGE_TAG} to namespace ${env.K8S_NAMESPACE}"
               helm upgrade --install ${params.SERVICE_NAME} ${chartPath} \\
                 --namespace ${env.K8S_NAMESPACE} \\
