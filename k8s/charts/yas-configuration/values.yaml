@@ -257,7 +257,7 @@ customerApplicationConfig:
 # Search application config custom
 searchApplicationConfig:
   elasticsearch:
-    url: https://elasticsearch-es-http.elasticsearch:9200
+    url: http://elasticsearch-es-http.elasticsearch:9200
     username: ${ELASTICSEARCH_USERNAME}
     password: ${ELASTICSEARCH_PASSWORD}
 
