@@ -1,6 +1,6 @@
 pipeline {
     agent any
-
+    // change for dummy test
     // ==========================================================================
     // Trigger on every git push (branch or tag) (Requirement 3)
     // Requires: "GitHub Integration" or "Generic Webhook Trigger" plugin
@@ -341,7 +341,7 @@ PIPELINE SUCCEEDED
 PIPELINE FAILED
    Type   : ${env.TAG_NAME ?: env.BRANCH_NAME ?: 'unknown'}
    Commit : ${env.COMMIT_SHA}
-   Check Console Output for details
+   Check Console Output for details 
 ============================================================
             """
         }
