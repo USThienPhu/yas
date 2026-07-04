@@ -72,9 +72,7 @@ pipeline {
         withCredentials([file(credentialsId: env.KUBECONFIG_CREDS, variable: 'KUBECONFIG')]) {
           script {
             def workerIp = sh(
-              script: """kubectl get nodes \\
-                --selector='!node-role.kubernetes.io/control-plane' \\
-                -o jsonpath='{.items[0].status.addresses[?(@.type=="ExternalIP")].address}'""",
+              script: """curl -s ifconfig.me || curl -s ipinfo.io/ip || kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}'""",
               returnStdout: true
             ).trim()
 
