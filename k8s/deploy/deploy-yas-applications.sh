@@ -26,7 +26,7 @@ fi
 helm repo add stakater https://stakater.github.io/stakater-charts
 helm repo update
 
-DOMAIN="$(yq -r '.domain' ./cluster-config.yaml)"
+DOMAIN="test.$(yq -r '.domain' ./cluster-config.yaml)"
 EXTERNAL_ACCESS_PORT="$(yq -r '.keycloak.externalAccessPort // 80' ./cluster-config.yaml)"
 
 external_url() {
