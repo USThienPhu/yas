@@ -21,7 +21,7 @@ pipeline {
         // For tag push (v*): IMAGE_TAG = tag name, e.g. v1.2.3
         // For main branch:     IMAGE_TAG = latest
         // Otherwise:           IMAGE_TAG = commit SHA
-        IMAGE_TAG = "${env.TAG_NAME ?: (env.BRANCH_NAME == 'main' ? 'latest' : env.COMMIT_SHA)}"
+        IMAGE_TAG = "${env.TAG_NAME ?: env.COMMIT_SHA}"
 
         // Detect if this is a staging release (tag v*)
         IS_STAGING = "${env.TAG_NAME != null && env.TAG_NAME =~ /v.*/ ? 'true' : 'false'}"
