@@ -8,6 +8,7 @@ pipeline {
         'product', 'cart', 'order', 'customer',
         'inventory', 'tax', 'media', 'search',
         'storefront-bff', 'backoffice-bff',
+        'storefront-ui', 'backoffice-ui',
         'ALL_YAS_SERVICES'
       ],
       description: '🗑️  Select service to remove (ALL_YAS_SERVICES = remove entire yas namespace)'

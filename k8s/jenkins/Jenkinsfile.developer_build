@@ -7,7 +7,8 @@ pipeline {
       choices: [
         'product', 'cart', 'order', 'customer',
         'inventory', 'tax', 'media', 'search',
-        'storefront-bff', 'backoffice-bff'
+        'storefront-bff', 'backoffice-bff',
+        'storefront-ui', 'backoffice-ui'
       ],
       description: '🔧 Select the service to deploy from your dev branch'
     )
