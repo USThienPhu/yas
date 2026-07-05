@@ -47,12 +47,18 @@ pipeline {
               def ingressHost = isFrontend 
                 ? (params.SERVICE_NAME == 'storefront-ui' ? 'storefront.test.yas.local.com' : 'backoffice.test.yas.local.com')
                 : 'api.test.yas.local.com'
+              def dockerImageName = params.SERVICE_NAME
+              if (params.SERVICE_NAME == 'storefront-ui') {
+                  dockerImageName = 'storefront'
+              } else if (params.SERVICE_NAME == 'backoffice-ui') {
+                  dockerImageName = 'backoffice'
+              }
               sh """
                 echo "♻️  Reverting ${params.SERVICE_NAME} to default main/latest configuration..."
                 helm upgrade --install ${params.SERVICE_NAME} ${chartPath} \\
                   --namespace ${env.K8S_NAMESPACE} \\
                   --reset-values \\
-                  --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${params.SERVICE_NAME} \\
+                  --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${dockerImageName} \\
                   --set ${prefix}.image.tag=latest \\
                   --set ${prefix}.ingress.host=${ingressHost} \\
                   --wait --timeout 5m
