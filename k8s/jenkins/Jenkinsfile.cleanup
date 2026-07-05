@@ -54,6 +54,8 @@ pipeline {
                   dockerImageName = 'backoffice'
               }
               sh """
+                echo "📦 Building dependencies for ${params.SERVICE_NAME}..."
+                helm dependency build ${chartPath}
                 echo "♻️  Reverting ${params.SERVICE_NAME} to default main/latest configuration..."
                 helm upgrade --install ${params.SERVICE_NAME} ${chartPath} \\
                   --namespace ${env.K8S_NAMESPACE} \\
