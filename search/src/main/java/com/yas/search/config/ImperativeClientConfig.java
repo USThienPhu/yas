@@ -14,8 +14,9 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import org.apache.http.HttpRequest;
-import org.apache.http.protocol.HttpContext;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.EntityDetails;
+import org.apache.hc.core5.http.protocol.HttpContext;
 
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "com.yas.search.repository")
@@ -44,10 +45,10 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
                 .withConnectTimeout(Duration.ofSeconds(10))
                 .withSocketTimeout(Duration.ofSeconds(30))
                 .withHttpClientConfigurer(clientBuilder -> {
-                    clientBuilder.addInterceptorFirst((HttpRequest request, HttpContext context) -> {
-                        if (request.getRequestLine().getMethod().equalsIgnoreCase("HEAD")) {
+                    clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
+                        if (request.getMethod().equalsIgnoreCase("HEAD")) {
                             request.removeHeaders("Accept");
-                            request.addHeader("Accept", "*/*");
+                            request.setHeader("Accept", "*/*");
                         }
                     });
                     return clientBuilder;
