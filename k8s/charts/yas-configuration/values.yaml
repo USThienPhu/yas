@@ -282,6 +282,8 @@ recommendationApplicationConfig:
 sampledataApplicationConfig:
   spring:
     datasource:
+      username: ${POSTGRESQL_USERNAME}
+      password: ${POSTGRESQL_PASSWORD}
       product:
         url: jdbc:postgresql://postgresql.postgres:5432/product
       media:
