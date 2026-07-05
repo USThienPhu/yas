@@ -65,15 +65,6 @@ pipeline {
                 dockerImageName = 'backoffice'
             }
 
-            def extraArgs = ""
-            if (params.SERVICE_NAME == 'storefront-bff') {
-              extraArgs = "--set backend.extraEnvs[2].name=UI_HOST --set backend.extraEnvs[2].value=http://storefront-ui.${env.K8S_NAMESPACE}.svc.cluster.local:3000"
-            } else if (params.SERVICE_NAME == 'backoffice-bff') {
-              extraArgs = "--set backend.extraEnvs[2].name=UI_HOST --set backend.extraEnvs[2].value=http://backoffice-ui.${env.K8S_NAMESPACE}.svc.cluster.local:3000"
-            } else if (params.SERVICE_NAME == 'storefront-ui') {
-              extraArgs = "--set ui.extraEnvs[0].name=API_BASE_PATH --set ui.extraEnvs[0].value=http://storefront-bff.${env.K8S_NAMESPACE}.svc.cluster.local/api"
-            }
-
             sh """
               echo "📦 Building dependencies for ${params.SERVICE_NAME}..."
               helm dependency build ${chartPath}
@@ -85,7 +76,6 @@ pipeline {
                 --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${dockerImageName} \\
                 --set ${prefix}.image.tag=${env.IMAGE_TAG} \\
                 --set ${prefix}.ingress.host=${ingressHost} \\
-                ${extraArgs} \\
                 --wait --timeout 5m
             """
           }
