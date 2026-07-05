@@ -19,6 +19,7 @@ import org.apache.hc.core5.http.EntityDetails;
 import org.apache.hc.core5.http.protocol.HttpContext;
 import org.springframework.data.elasticsearch.client.elc.rest5_client.Rest5Clients;
 
+// Configure Elasticsearch client with request interceptor for compatibility
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "com.yas.search.repository")
 @ComponentScan(basePackages = "com.yas.search.service")
