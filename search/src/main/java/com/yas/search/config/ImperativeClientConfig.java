@@ -17,7 +17,7 @@ import java.time.Duration;
 import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.EntityDetails;
 import org.apache.hc.core5.http.protocol.HttpContext;
-import org.springframework.data.elasticsearch.client.elc.ElasticsearchClients;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchClientConfigurationCallback;
 
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "com.yas.search.repository")
@@ -45,7 +45,7 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
                 .withBasicAuth(elasticsearchConfig.getUsername(), elasticsearchConfig.getPassword())
                 .withConnectTimeout(Duration.ofSeconds(10))
                 .withSocketTimeout(Duration.ofSeconds(30))
-                .withClientConfigurer(ElasticsearchClients.ElasticsearchClientConfigurationCallback.from(restClientBuilder -> {
+                .withClientConfigurer(ElasticsearchClientConfigurationCallback.from(restClientBuilder -> {
                     return restClientBuilder.setHttpClientConfigCallback(clientBuilder -> {
                         clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
                             if (request.getMethod().equalsIgnoreCase("HEAD")) {
