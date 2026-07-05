@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-v2
+  namespace: yas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: product
+      app.kubernetes.io/name: product
+      version: v2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: product
+        app.kubernetes.io/name: product
+        version: v2
+    spec:
+      serviceAccountName: product
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: html-volume
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: html-volume
+        configMap:
+          name: product-v2-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-v2-html
+  namespace: yas
+data:
+  index.html: |
+    {"message": "Hello from Product V2 (Mock Service Mesh Demo)"}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: product
+  namespace: yas
+spec:
+  host: product
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: product
+  namespace: yas
+spec:
+  hosts:
+  - product
+  http:
+  - route:
+    - destination:
+        host: product
+        subset: v1
+      weight: 80
+    - destination:
+        host: product
+        subset: v2
+      weight: 20
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+      retryOn: "5xx,connect-failure,refused-stream"
