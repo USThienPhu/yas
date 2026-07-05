@@ -17,7 +17,7 @@ import java.time.Duration;
 import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.EntityDetails;
 import org.apache.hc.core5.http.protocol.HttpContext;
-import org.springframework.data.elasticsearch.client.elc.ElasticsearchClientConfigurationCallback;
+import org.springframework.data.elasticsearch.client.elc.rest5_client.Rest5Clients;
 
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "com.yas.search.repository")
@@ -45,16 +45,14 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
                 .withBasicAuth(elasticsearchConfig.getUsername(), elasticsearchConfig.getPassword())
                 .withConnectTimeout(Duration.ofSeconds(10))
                 .withSocketTimeout(Duration.ofSeconds(30))
-                .withClientConfigurer(ElasticsearchClientConfigurationCallback.from(restClientBuilder -> {
-                    return restClientBuilder.setHttpClientConfigCallback(clientBuilder -> {
-                        clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
-                            if (request.getMethod().equalsIgnoreCase("HEAD")) {
-                                request.removeHeaders("Accept");
-                                request.setHeader("Accept", "*/*");
-                            }
-                        });
-                        return clientBuilder;
+                .withClientConfigurer(Rest5Clients.ElasticsearchHttpClientConfigurationCallback.from(clientBuilder -> {
+                    clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
+                        if (request.getMethod().equalsIgnoreCase("HEAD")) {
+                            request.removeHeaders("Accept");
+                            request.setHeader("Accept", "*/*");
+                        }
                     });
+                    return clientBuilder;
                 }))
                 .build();
     }
