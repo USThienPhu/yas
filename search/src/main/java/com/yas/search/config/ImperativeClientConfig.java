@@ -45,14 +45,16 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
                 .withBasicAuth(elasticsearchConfig.getUsername(), elasticsearchConfig.getPassword())
                 .withConnectTimeout(Duration.ofSeconds(10))
                 .withSocketTimeout(Duration.ofSeconds(30))
-                .withClientConfigurer(ElasticsearchClients.ElasticsearchHttpClientConfigurationCallback.from(clientBuilder -> {
-                    clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
-                        if (request.getMethod().equalsIgnoreCase("HEAD")) {
-                            request.removeHeaders("Accept");
-                            request.setHeader("Accept", "*/*");
-                        }
+                .withClientConfigurer(ElasticsearchClients.ElasticsearchRestClientConfigurationCallback.from(restClientBuilder -> {
+                    return restClientBuilder.setHttpClientConfigCallback(clientBuilder -> {
+                        clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
+                            if (request.getMethod().equalsIgnoreCase("HEAD")) {
+                                request.removeHeaders("Accept");
+                                request.setHeader("Accept", "*/*");
+                            }
+                        });
+                        return clientBuilder;
                     });
-                    return clientBuilder;
                 }))
                 .build();
     }
