@@ -11,9 +11,9 @@ Tài liệu này hướng dẫn bạn tự thực thi toàn bộ yêu cầu cấ
    ssh -i ~/.ssh/yas_devops_shared devops@34.126.162.233
    ```
 
-2. **Tải phiên bản Istio mới nhất**:
+2. **Tải phiên bản Istio (chỉ định phiên bản 1.30.2 ổn định để chạy được cả Local và VM)**:
    ```bash
-   curl -L https://istio.io/downloadIstio | sh -
+   curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.30.2 sh -
    ```
 
 3. **Truy cập thư mục Istio mới tải xuống** (Ví dụ bản 1.30.2, thay đổi số phiên bản nếu khác):
