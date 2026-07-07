@@ -118,11 +118,31 @@ Cấu hình chính sách tự động thử lại (Retry) 3 lần nếu gặp l�
      kubectl run test-pod-allowed -n yas --image=curlimages/curl --restart=Never --overrides='{"spec":{"serviceAccountName":"storefront-bff"}}' -- sleep 3600
      ```
 
-2. **Đợi vài giây cho các pod trên ở trạng thái Running, sau đó chạy script test**:
+2. **Chạy script kiểm thử tự động để kiểm tra nhanh các chính sách**:
    ```bash
    chmod +x verify_mesh.sh
    ./verify_mesh.sh
    ```
+
+3. **Chạy kiểm thử thủ công và lấy Bằng chứng Retry (Retry Evidence)**:
+   Để kiểm tra xem Envoy có thực sự thử lại khi gặp sự cố hay không:
+   * **Hạ số lượng Pod của `product` xuống 0 để giả lập lỗi:**
+     ```bash
+     kubectl scale deployment product -n yas --replicas=0
+     ```
+   * **Gửi request từ `test-pod-allowed` sang `product` (lúc này sẽ trả về lỗi 503):**
+     ```bash
+     kubectl exec test-pod-allowed -n yas -c test-pod-allowed -- curl -i http://product/
+     ```
+   * **Truy vấn số liệu thống kê (Stats) đếm số lần thử lại từ Envoy Proxy:**
+     ```bash
+     kubectl exec test-pod-allowed -n yas -c istio-proxy -- curl -s http://localhost:15000/stats | grep "product.yas.svc.cluster.local.upstream_rq_retry"
+     ```
+     *(Bạn sẽ thấy dòng `upstream_rq_retry: 3` chứng tỏ proxy đã tự động thử lại đúng 3 lần).*
+   * **Khôi phục lại dịch vụ `product` về trạng thái bình thường:**
+     ```bash
+     kubectl scale deployment product -n yas --replicas=1
+     ```
 
 ---
 
