@@ -91,26 +91,18 @@ Chỉ cho phép service account `storefront-bff` được phép gọi tới serv
 
 ---
 
-## Bước 5: Cấu hình Traffic Splitting (80/20) và Retry Policy
+## Bước 5: Cấu hình Retry Policy
 
-Để demo tính năng phân chia lưu lượng, chúng ta cần:
-- Gán nhãn `version=v1` cho deployment `product` hiện tại.
-- Triển khai một deployment `product-v2` giả lập (mock container bằng Nginx trả về chuỗi text để dễ nhận biết).
-- Định nghĩa `DestinationRule` chia thành 2 subset `v1` và `v2`.
-- Định nghĩa `VirtualService` để thực hiện điều phối 80% traffic vào V1, 20% vào V2, đồng thời tích hợp chính sách tự động thử lại (Retry) 3 lần nếu gặp lỗi 5xx.
+Cấu hình chính sách tự động thử lại (Retry) 3 lần nếu gặp lỗi 5xx hoặc mất kết nối khi gọi vào dịch vụ `product`.
 
-1. **Gán nhãn `version=v1` cho Pod template của deployment `product`**:
+1. **Áp dụng file cấu hình Retry Policy**:
    ```bash
-   kubectl patch deployment product -n yas -p '{"spec":{"template":{"metadata":{"labels":{"version":"v1"}}}}}'
+   kubectl apply -f retry-policy.yaml
    ```
-
-2. **Áp dụng file cấu hình Traffic Splitting**:
-   ```bash
-   kubectl apply -f traffic-splitting.yaml
-   ```
-   *(File cấu hình chi tiết bao gồm deployment `product-v2` nằm tại `k8s/istio/traffic-splitting.yaml`)*
+   *(File cấu hình chi tiết nằm tại `k8s/istio/retry-policy.yaml`)*
 
 ---
+
 
 ## Bước 6: Kiểm thử và Xác minh
 
