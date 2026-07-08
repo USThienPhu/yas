@@ -16,6 +16,7 @@ pipeline {
   }
 
   environment {
+    DOCKER_HUB_USER  = 'thaithienphu'
     K8S_NAMESPACE    = 'yas'
     KUBECONFIG_CREDS = 'kubeconfig-credentials'
   }
@@ -40,10 +41,30 @@ pipeline {
                 echo "✅ All Helm releases removed from ${env.K8S_NAMESPACE}"
               """
             } else {
+              def chartPath = "k8s/charts/${params.SERVICE_NAME}"
+              def isFrontend = params.SERVICE_NAME.endsWith('-ui')
+              def prefix = isFrontend ? 'ui' : 'backend'
+              def ingressHost = isFrontend 
+                ? (params.SERVICE_NAME == 'storefront-ui' ? 'storefront.test.yas.local.com' : 'backoffice.test.yas.local.com')
+                : 'api.test.yas.local.com'
+              def dockerImageName = params.SERVICE_NAME
+              if (params.SERVICE_NAME == 'storefront-ui') {
+                  dockerImageName = 'storefront'
+              } else if (params.SERVICE_NAME == 'backoffice-ui') {
+                  dockerImageName = 'backoffice'
+              }
               sh """
-                echo "🗑️  Uninstalling ${params.SERVICE_NAME}..."
-                helm uninstall ${params.SERVICE_NAME} -n ${env.K8S_NAMESPACE} || true
-                echo "✅ ${params.SERVICE_NAME} removed from ${env.K8S_NAMESPACE}"
+                echo "📦 Building dependencies for ${params.SERVICE_NAME}..."
+                helm dependency build ${chartPath}
+                echo "♻️  Reverting ${params.SERVICE_NAME} to default main/latest configuration..."
+                helm upgrade --install ${params.SERVICE_NAME} ${chartPath} \\
+                  --namespace ${env.K8S_NAMESPACE} \\
+                  --reset-values \\
+                  --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${dockerImageName} \\
+                  --set ${prefix}.image.tag=latest \\
+                  --set ${prefix}.ingress.host=${ingressHost} \\
+                  --wait --timeout 5m
+                echo "✅ ${params.SERVICE_NAME} reverted to default tag (main/latest)"
               """
             }
           }

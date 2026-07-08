@@ -29,10 +29,20 @@ pipeline {
     stage('Resolve Image Tag') {
       steps {
         script {
-          // Use branch name as tag, or 'latest' for main
-          env.IMAGE_TAG = (params.DEV_BRANCH.trim() == 'main') \
-            ? 'latest' \
-            : params.DEV_BRANCH.trim().replace('/', '-')
+          if (params.DEV_BRANCH.trim() == 'main') {
+            env.IMAGE_TAG = 'latest'
+          } else {
+            // Get the latest commit SHA (7 characters) of the dev branch on remote
+            def gitSha = sh(
+              script: "git ls-remote origin refs/heads/${params.DEV_BRANCH.trim()} | cut -f1",
+              returnStdout: true
+            ).trim()
+            if (gitSha) {
+              env.IMAGE_TAG = gitSha.take(7)
+            } else {
+              error "Could not resolve commit SHA for branch ${params.DEV_BRANCH}"
+            }
+          }
           echo "🏷️  Image tag resolved: ${env.IMAGE_TAG}"
         }
       }
@@ -48,6 +58,12 @@ pipeline {
             def ingressHost = isFrontend 
               ? (params.SERVICE_NAME == 'storefront-ui' ? 'storefront.test.yas.local.com' : 'backoffice.test.yas.local.com')
               : 'api.test.yas.local.com'
+            def dockerImageName = params.SERVICE_NAME
+            if (params.SERVICE_NAME == 'storefront-ui') {
+                dockerImageName = 'storefront'
+            } else if (params.SERVICE_NAME == 'backoffice-ui') {
+                dockerImageName = 'backoffice'
+            }
 
             sh """
               echo "📦 Building dependencies for ${params.SERVICE_NAME}..."
@@ -57,7 +73,7 @@ pipeline {
                 --namespace ${env.K8S_NAMESPACE} \\
                 --create-namespace \\
                 --reset-values \\
-                --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${params.SERVICE_NAME} \\
+                --set ${prefix}.image.repository=${env.DOCKER_HUB_USER}/${dockerImageName} \\
                 --set ${prefix}.image.tag=${env.IMAGE_TAG} \\
                 --set ${prefix}.ingress.host=${ingressHost} \\
                 --wait --timeout 5m

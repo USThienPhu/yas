@@ -198,6 +198,7 @@ backofficeBffExtraConfig:
               token-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
               jwk-set-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/certs
               user-info-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/userinfo
+              user-name-attribute: preferred_username
           registration:
             api-client:
               provider: keycloak
@@ -224,6 +225,7 @@ storefrontBffExtraConfig:
               token-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/token
               jwk-set-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/certs
               user-info-uri: http://keycloak-service.keycloak/realms/Yas/protocol/openid-connect/userinfo
+              user-name-attribute: preferred_username
           registration:
             keycloak:
               provider: keycloak
@@ -282,6 +284,8 @@ recommendationApplicationConfig:
 sampledataApplicationConfig:
   spring:
     datasource:
+      username: ${POSTGRESQL_USERNAME}
+      password: ${POSTGRESQL_PASSWORD}
       product:
         url: jdbc:postgresql://postgresql.postgres:5432/product
       media:

@@ -14,7 +14,12 @@ import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import org.apache.hc.core5.http.HttpRequest;
+import org.apache.hc.core5.http.EntityDetails;
+import org.apache.hc.core5.http.protocol.HttpContext;
+import org.springframework.data.elasticsearch.client.elc.rest5_client.Rest5Clients;
 
+// Configure Elasticsearch client with request interceptor for compatibility
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "com.yas.search.repository")
 @ComponentScan(basePackages = "com.yas.search.service")
@@ -41,6 +46,15 @@ public class ImperativeClientConfig extends ElasticsearchConfiguration {
                 .withBasicAuth(elasticsearchConfig.getUsername(), elasticsearchConfig.getPassword())
                 .withConnectTimeout(Duration.ofSeconds(10))
                 .withSocketTimeout(Duration.ofSeconds(30))
+                .withClientConfigurer(Rest5Clients.ElasticsearchHttpClientConfigurationCallback.from(clientBuilder -> {
+                    clientBuilder.addRequestInterceptorFirst((HttpRequest request, EntityDetails entity, HttpContext context) -> {
+                        if (request.getMethod().equalsIgnoreCase("HEAD")) {
+                            request.removeHeaders("Accept");
+                            request.setHeader("Accept", "*/*");
+                        }
+                    });
+                    return clientBuilder;
+                }))
                 .build();
     }
 
